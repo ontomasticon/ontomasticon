@@ -66,11 +66,15 @@ function checkUpdate() {
   }
   global $db;
   $url = "https://raw.githubusercontent.com/ontomasticon/ontomasticon/master/index.php";
-  $h = fopen($url, "r");
+  //Short timeout, as this runs while an admin page is loading
+  $context = stream_context_create(array("http" => array("timeout" => 5)));
+  $h = @fopen($url, "r", FALSE, $context);
+
+  //Record the attempt even if it fails, so it isn't retried on every page load
+  $sql = "UPDATE config SET value = UNIX_TIMESTAMP() WHERE `key` = 'update_check';";
+  $db->query($sql);
 
   if ($h) {
-    $sql = "UPDATE config SET value = UNIX_TIMESTAMP() WHERE `key` = 'update_check';";
-    $db->query($sql);
     $sql = "UPDATE config SET value = 1 WHERE `key` = 'update_check_ok';";
     $db->query($sql);
     while (($line = fgets($h)) !== FALSE) {
@@ -86,11 +90,11 @@ function checkUpdate() {
         $db->query($sql);
       }
     }
+    fclose($h);
   } else {
     $sql = "UPDATE config SET value = 0 WHERE `key` = 'update_check_ok';";
     $db->query($sql);
   }
-  fclose($h);
 }
 
 function bool2check($bool) {
@@ -114,6 +118,23 @@ function adminSanity() {
   checkUpdate();
   $ret = NULL;
   global $db;
+  $config = $GLOBALS["ontomasticon"]["config"];
+
+  if (is_dir("inst")) {
+    $ret["Installer"] = "For security please delete the inst directory.";
+  }
+
+  //Not shown on the update page itself, which reports the result of updating
+  $pageInfo = $GLOBALS["ontomasticon"]["pageInfo"];
+  if (!($pageInfo["page_type"] == "admin" && $pageInfo["active_page"] == "update")) {
+    if ((float)$config["version_db"] < (float)$config["version"]) {
+      $ret["Database update"] = "You need to run the ".l("database update script", "/admin/update").".";
+    }
+    if ((float)$config["version_db"] > (float)$config["version"]) {
+      $ret["Database update"] = "The database is running a more recent version than the code base. Please upgrade.";
+    }
+  }
+
   $sql = 'SELECT password FROM users WHERE id = 1;';
   $rs = $db->query($sql);
   $numrows = mysqli_num_rows($rs);
@@ -125,7 +146,7 @@ function adminSanity() {
     }
   }
 
-  if ($GLOBALS["ontomasticon"]["config"]["update_available"] == 1) {
+  if ($config["update_available"] == 1) {
     $ret["Update Available"] = "A new version is available.";
   }
   return($ret);

@@ -11,7 +11,7 @@
 <?php
 if (file_exists("settings/user.css")) {
   ?>
-  <link rel="stylesheet" type="text/css" href="<?php print h($GLOBALS["ontomasticon"]["config"]["base_url"]); ?>settings/user.css" />
+  <link rel="stylesheet" type="text/css" href="/settings/user.css" />
   <?php
 }
 ?>

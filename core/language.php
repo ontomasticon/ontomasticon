@@ -29,6 +29,9 @@ function t($text) {
     } else {
       return($text);
     }
+  } else {
+    //No translation file for this language
+    return($text);
   }
 }
 
