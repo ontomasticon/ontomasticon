@@ -6,19 +6,13 @@
 
 function CVcount() {
   global $db;
-  $sql = "SELECT COUNT(*) AS `count` FROM `cv`;";
-  $result = $db->query($sql);
-  if ($result) {
-    $result = $db->query($sql);
-    if ($result) {
-      $row = $result->fetch_array(MYSQLI_ASSOC);
-      $cv_count = $row["count"];
-      $result->close();
-    }
-  } else {
-    $cv_count = 0;
+  $result = $db->query("SELECT COUNT(*) AS `count` FROM `cv`;");
+  if (!$result) {
+    return(0);
   }
-  return($cv_count);
+  $row = $result->fetch_assoc();
+  $result->close();
+  return($row["count"]);
 }
 
 function getCVs() {
