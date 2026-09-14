@@ -63,6 +63,7 @@ function lang_jibberish() {
     "Controlled vocabulary added." => "New weird word list recorded.",
     "No matching term found" => "That jabber has flown away",
     "Not saved. A short name is required." => "Nothing scribbled. Jabber is required.",
+    "Not saved. A short name can only use the letters A to Z, digits, hyphens, underscores and full stops, and can't start with a full stop." => "Nothing scribbled. Jabber may only hold plain letters, digits, dashes, underscores and dots, and can't begin with a dot.",
     "Not saved. There is already a term with the short name" => "Nothing scribbled. This jabber is taken:",
     "Not saved. There is no term with the short name" => "Nothing scribbled. No such jabber:",
     "Not saved. There is already a controlled vocabulary with the short name" => "Nothing scribbled. This weird word list exists already:"
