@@ -45,9 +45,9 @@ if (!userAllow("edit-terms")) {
         value="<?php print h($CV["shortname"]); ?>" <?php print val2check($sn["cv"], $CV["shortname"]); ?>>
       <label for="<?php print h($CV["shortname"]); ?>"><?php print h($CV["name"]); ?></label><br/>
     <?php }
-    print "<br/"; ?>
+    print "<br/>"; ?>
     <label for="none"><?php print t("Invalidity"); ?></label><br/>
-    <input type="radio" id="none" name="invalid" value="none" <?php print val2check($sn["cv"], ""); ?>>
+    <input type="radio" id="none" name="invalid" value="none" <?php print val2check($sn["invalid_reason"], ""); ?>>
     <label for="none"><?php print t("None"); ?></label><br>
     <input type="radio" id="synonym" name="invalid" value="Synonym" <?php print val2check($sn["invalid_reason"], "Synonym"); ?>>
     <label for="synonym"><?php print t("Synonym"); ?></label><br/><br/>

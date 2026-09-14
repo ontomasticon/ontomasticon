@@ -17,9 +17,11 @@ function saveConfig() {
   $vals["base_url"] = trim($_POST['base_url']);
   $vals["description"] = trim($_POST['description']);
 
+  $ok = TRUE;
   foreach ($vals as $key => $val) {
-    dbQuery("UPDATE `config` SET `value` = ? WHERE `key` = ?;", array($val, $key));
+    $ok = dbQuery("UPDATE `config` SET `value` = ? WHERE `key` = ?;", array($val, $key)) && $ok;
   }
+  reportSaved($ok);
   $GLOBALS["ontomasticon"]["config"] = getConfig($db);
 }
 
@@ -65,4 +67,17 @@ function checkConfig($config) {
     error_reporting(E_ALL);
   }
   return($config);
+}
+
+/**
+ * Record the version the database schema matches, after an update step.
+ *
+ * @param String $v Version the database now matches
+ *
+ * @return String $v, for tracking progress through the update steps
+ */
+function setDBVersion($v) {
+  dbQuery("UPDATE `config` SET `value` = ? WHERE `key` = 'version_db';", array($v));
+  dbQuery("UPDATE `config` SET `value` = ? WHERE `key` = 'version';", array($v));
+  return($v);
 }

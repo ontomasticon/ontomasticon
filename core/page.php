@@ -14,15 +14,18 @@ function activePage() {
       break;
     case "cv":
       $ret["page_type"] = "cv";
-      $ret["active_page"] = $parts[2];
+      $ret["active_page"] = (isset($parts[2])) ? $parts[2] : "";
       break;
     case "ping":
       $ret["page_type"] = "ping";
       $ret["active_page"] = "";
       break;
     case "update":
-      $ret["page_type"] = "update";
-      $ret["active_page"] = "";
+      //Shortcut for the database update page
+      $ret["page_type"] = "admin";
+      $ret["active_page"] = "update";
+      $ret["active_subpage"] = null;
+      $ret["active_subsubpage"] = null;
       break;
     case "user":
       $ret["page_type"] = "user";
@@ -34,7 +37,7 @@ function activePage() {
       break;
     case "admin":
       $ret["page_type"] = "admin";
-      $ret["active_page"] = $parts[2];
+      $ret["active_page"] = (isset($parts[2])) ? $parts[2] : "";
       if (isset($parts[3])) {
         $ret["active_subpage"] = $parts[3];
         if (isset($parts[4])) {
@@ -48,11 +51,12 @@ function activePage() {
       }
       break;
     case "settings":
-      if ($parts[2]== "user.css") {
+      if (isset($parts[2]) && $parts[2] == "user.css" && file_exists("settings/user.css")) {
         header('Content-Type: text/css');
         readfile("settings/user.css");
         exit;
       }
+      $ret["page_type"] = "home";
       break;
     default:
       $ret["page_type"] = "home";

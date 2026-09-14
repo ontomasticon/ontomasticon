@@ -4,6 +4,11 @@
 //
 // Code for managing user accounts and permissions.
 
+//Failed logins allowed within LOGIN_WINDOW seconds, per email address and per IP address
+define("LOGIN_WINDOW", 900);
+define("LOGIN_MAX_PER_EMAIL", 5);
+define("LOGIN_MAX_PER_IP", 20);
+
 //Roles a user can have and the tasks each allows. "*" allows every task.
 function userRoles() {
   return(array(
@@ -95,27 +100,48 @@ function verifyPassword($password, $row) {
   return(TRUE);
 }
 
+//Check whether too many logins have recently failed for this email address or IP address.
+//If the login_attempts table doesn't exist yet (before the 0.3 update) logins are not limited.
+function loginLocked($email, $ip) {
+  $since = time() - LOGIN_WINDOW;
+  //Attempts older than the window are no longer needed
+  dbQuery("DELETE FROM `login_attempts` WHERE `attempted` < ?;", array($since));
+  $rs = dbQuery("SELECT SUM(`email` = ?) AS `email_count`, SUM(`ip` = ?) AS `ip_count` FROM `login_attempts`;", array($email, $ip));
+  $row = ($rs) ? $rs->fetch_assoc() : null;
+  if ($row == null) {
+    return(FALSE);
+  }
+  return($row["email_count"] >= LOGIN_MAX_PER_EMAIL || $row["ip_count"] >= LOGIN_MAX_PER_IP);
+}
+
 //Log in from the login form. Must run before any output is sent.
 //Returns a message for the login page, or NULL on success.
 function login(){
   $email = trim($_POST['email']);
   $password = trim($_POST['password']);
+  $ip = clientIP();
+
+  if (loginLocked($email, $ip)) {
+    return("Too many failed logins. Please try again later.");
+  }
 
   $rs = dbQuery("SELECT * FROM `users` WHERE email = ?;", array($email));
   $numRows = ($rs) ? mysqli_num_rows($rs) : 0;
-  if($numRows  == 1){
+  if ($numRows == 1) {
     $row = mysqli_fetch_assoc($rs);
-    if(verifyPassword($password, $row)){
+    if (verifyPassword($password, $row)) {
+      dbQuery("DELETE FROM `login_attempts` WHERE `email` = ?;", array($email));
       //A new session id on login prevents session fixation
       session_regenerate_id(TRUE);
       $_SESSION["user"] = $email;
       return(null);
-    } else {
-      return("Wrong password");
     }
+    $message = "Wrong password";
   } else {
-    return("No matching user found");
+    $message = "No matching user found";
   }
+  dbQuery("INSERT INTO `login_attempts` (`email`, `ip`, `attempted`) VALUES (?, ?, ?);", array($email, $ip, time()));
+  return($message);
 }
 
 //Log out. Must run before any output is sent.
@@ -140,13 +166,20 @@ function getUsers() {
   return(($result) ? $result->fetch_all(MYSQLI_ASSOC) : array());
 }
 
+//Email addresses and passwords are trimmed, to match what login() does
 function createUser(){
-  $firstName = $_POST['first_name'];
-  $surName   = $_POST['surname'];
-  $email     = $_POST['email'];
-  $password  = $_POST['password'];
+  $firstName = trim($_POST['first_name']);
+  $surName   = trim($_POST['surname']);
+  $email     = trim($_POST['email']);
+  $password  = trim($_POST['password']);
   $roles     = userRoles();
   $role      = (isset($_POST['role']) && isset($roles[$_POST['role']])) ? $_POST['role'] : null;
+
+  //Login needs each email address to belong to exactly one user
+  if (loadUser($email) != null) {
+    print t("A user with that email address already exists");
+    return;
+  }
 
   $hashPassword = password_hash($password,PASSWORD_DEFAULT);
 
@@ -154,6 +187,8 @@ function createUser(){
   $result = dbQuery($sql, array($firstName, $surName, $email, $hashPassword, $role));
   if($result) {
     print t("User created");
+  } else {
+    print t("The user could not be created");
   }
 }
 
@@ -173,14 +208,15 @@ function setUserRole() {
   return("Role updated");
 }
 
+//Passwords are trimmed, to match what login() does
 function editUser() {
   $error = "";
 
-  $first_name  = $_POST['first_name'];
-  $last_name   = $_POST['last_name'];
-  $o_password  = $_POST['old_password'];
-  $n_password1 = $_POST['new_password1'];
-  $n_password2 = $_POST['new_password2'];
+  $first_name  = trim($_POST['first_name']);
+  $last_name   = trim($_POST['last_name']);
+  $o_password  = trim($_POST['old_password']);
+  $n_password1 = trim($_POST['new_password1']);
+  $n_password2 = trim($_POST['new_password2']);
 
   if (!($o_password == "" && $n_password1 == "" && $n_password2 == "")) {
     if ($o_password == "") {

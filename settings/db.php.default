@@ -5,3 +5,10 @@
 // Example database connection
 
 $db = new mysqli("localhost", "user", "password", "database");
+
+// If the site is behind a CDN or reverse proxy (e.g. Cloudflare), list the proxy's
+// addresses as single IPs or CIDR ranges. Visitors' real IP addresses (used to limit
+// failed logins) and whether they used HTTPS are then read from the headers the proxy
+// adds. Only list addresses you trust: any other client could fake those headers.
+// Cloudflare publishes its full list of ranges at https://www.cloudflare.com/ips/
+// $trusted_proxies = array("173.245.48.0/20", "2400:cb00::/32");

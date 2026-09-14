@@ -13,13 +13,12 @@ if ($activeCV == null) {
   <h2><?php print t("Controlled Vocabulary").": ".h($activeCV["name"]); ?></h2>
   <div id="description"><?php print $activeCV["description"]; ?></div>
 <?php
-}
-global $db;
-$terms = getTerms($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]);
-$oe = 1;
-foreach ($terms as $t) {
-  $GLOBALS["ontomasticon"]["term"] = $t;
-  $GLOBALS["ontomasticon"]["oddeven"] = oe($oe);
-  template("term-fragment.php");
-  $oe *= -1;
+  $terms = getTerms($activeCV["shortname"]);
+  $oe = 1;
+  foreach ($terms as $t) {
+    $GLOBALS["ontomasticon"]["term"] = $t;
+    $GLOBALS["ontomasticon"]["oddeven"] = oe($oe);
+    template("term-fragment.php");
+    $oe *= -1;
+  }
 }

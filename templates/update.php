@@ -1,26 +1,73 @@
 <?php
 
 if (!userAllow("administer")) {
-    print t("You do not have permission to administer this site");
-  } else {
-    global $db;
-    $updated = FALSE;
-    if ((float) $GLOBALS["ontomasticon"]["config"]["version_db"] < 0.2) {
-        $sql = "ALTER TABLE `terms` ADD COLUMN `reference` VARCHAR(500) NULL AFTER `broader`;";
-        mysqli_query($db, $sql);
+  print t("You do not have permission to administer this site");
+} else {
+  global $db;
+  $version_db = (string)$GLOBALS["ontomasticon"]["config"]["version_db"];
+  $updated = FALSE;
+  $failed = FALSE;
 
-        $sql = "UPDATE `config` SET `value` = 0.2 WHERE `key` = 'version';";
-        mysqli_query($db, $sql);
-        $sql = "UPDATE `config` SET `value` = 0.2 WHERE `key` = 'version_db';";
-        mysqli_query($db, $sql);
-        
-        $updated = TRUE;
-        print t("Ontomasticon has been updated to version 0.2");
-    }
-
-    if ($updated) {
-        $GLOBALS["ontomasticon"]["config"] = getConfig($db);
+  if (version_compare($version_db, "0.2", "<")) {
+    $sql = "ALTER TABLE `terms` ADD COLUMN `reference` VARCHAR(500) NULL AFTER `broader`;";
+    //1060: the column already exists
+    if (mysqli_query($db, $sql) || $db->errno == 1060) {
+      $version_db = setDBVersion("0.2");
+      $updated = TRUE;
+      print "<p>".t("Ontomasticon has been updated to version 0.2")."</p>";
     } else {
-      print t("No updates required.");
+      $failed = TRUE;
+      print "<div class='error'><p>".t("Update to version 0.2 failed").": ".h($db->error)."</p></div>";
     }
+  }
+
+  if (!$failed && version_compare($version_db, "0.3", "<")) {
+    //Email addresses must be unique before the constraint can be added
+    $result = dbQuery("SELECT `email` FROM `users` WHERE `email` IS NOT NULL GROUP BY `email` HAVING COUNT(*) > 1;");
+    $duplicates = ($result) ? $result->fetch_all(MYSQLI_ASSOC) : array();
+    if (count($duplicates) > 0) {
+      $failed = TRUE;
+      print "<div class='error'><p>".t("Cannot update to version 0.3 because these email addresses belong to more than one user. Change or remove the duplicate accounts in the database, then run the update again.")."</p><ul>";
+      foreach ($duplicates as $duplicate) {
+        print "<li>".h($duplicate["email"])."</li>";
+      }
+      print "</ul></div>";
+    } else {
+      $steps = array(
+        //Each email address belongs to one user. 1061 (below): the key already exists
+        "ALTER TABLE `users` ADD UNIQUE KEY `email_UNIQUE` (`email`);",
+        //Failed logins, for rate limiting
+        "CREATE TABLE IF NOT EXISTS `login_attempts` (
+          `id` int(11) NOT NULL AUTO_INCREMENT,
+          `email` varchar(255) DEFAULT NULL,
+          `ip` varchar(45) DEFAULT NULL,
+          `attempted` int(11) NOT NULL,
+          PRIMARY KEY (`id`),
+          KEY `email_attempted` (`email`, `attempted`),
+          KEY `ip_attempted` (`ip`, `attempted`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+        //Deleting terms used to leave other terms pointing at them
+        "UPDATE `terms` AS `t` LEFT JOIN `terms` AS `p` ON `t`.`parent` = `p`.`id` SET `t`.`parent` = NULL WHERE `t`.`parent` IS NOT NULL AND `p`.`id` IS NULL;",
+        "UPDATE `terms` AS `t` LEFT JOIN `terms` AS `b` ON `t`.`broader` = `b`.`id` SET `t`.`broader` = NULL WHERE `t`.`broader` IS NOT NULL AND `b`.`id` IS NULL;"
+      );
+      foreach ($steps as $sql) {
+        if (!mysqli_query($db, $sql) && $db->errno != 1061) {
+          $failed = TRUE;
+          print "<div class='error'><p>".t("Update to version 0.3 failed").": ".h($db->error)."</p></div>";
+          break;
+        }
+      }
+      if (!$failed) {
+        $version_db = setDBVersion("0.3");
+        $updated = TRUE;
+        print "<p>".t("Ontomasticon has been updated to version 0.3")."</p>";
+      }
+    }
+  }
+
+  if ($updated) {
+    $GLOBALS["ontomasticon"]["config"] = getConfig($db);
+  } elseif (!$failed) {
+    print t("No updates required.");
+  }
 }

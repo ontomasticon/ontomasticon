@@ -5,21 +5,27 @@
 // Code to handle retreiving, editing and saving terms
 
 function getTerm($shortname) {
-  $result = dbQuery("SELECT * FROM `terms` WHERE `shortname` = ?;", array($shortname));
+  return(loadTerm("shortname", $shortname));
+}
+
+function getTermByID($id) {
+  return(loadTerm("id", $id));
+}
+
+//Load a term by its shortname or id, with its parent and broader terms given as shortnames
+function loadTerm($column, $value) {
+  if ($column == "id") {
+    $sql = "SELECT * FROM `terms` WHERE `id` = ?;";
+  } else {
+    $sql = "SELECT * FROM `terms` WHERE `shortname` = ?;";
+  }
+  $result = dbQuery($sql, array($value));
   if ($result) {
     $ret = $result->fetch_assoc();
     if ($result->num_rows == 0) {return(null);}
     $result->close();
-    if ($ret["parent"] != "") {
-      $res = dbQuery("SELECT `shortname` FROM `terms` WHERE `id` = ?;", array($ret["parent"]));
-      $ret["parent"] = $res->fetch_assoc()["shortname"];
-      $res->close();
-    }
-    if ($ret["broader"] != "") {
-      $res = dbQuery("SELECT `shortname` FROM `terms` WHERE `id` = ?;", array($ret["broader"]));
-      $ret["broader"] = $res->fetch_assoc()["shortname"];
-      $res->close();
-    }
+    $ret["parent"] = termShortname($ret["parent"]);
+    $ret["broader"] = termShortname($ret["broader"]);
     return($ret);
   } else {
     return(null);
@@ -41,36 +47,52 @@ function getTerms($cv=null) {
     $result->close();
   }
 
-  //Need to add child terms
+  //Fetch related terms for the whole list at once, rather than for each term
+  $ids = array_column($ret, "id");
+  $broaderIds = array();
+  foreach ($ret as $row) {
+    if ($row["broader"] != "") {
+      $broaderIds[] = $row["broader"];
+    }
+  }
+  $broaderIds = array_values(array_unique($broaderIds));
+
+  $children = termsGroupedBy("parent", "SELECT * FROM `terms` WHERE `parent` IN (%s) ORDER BY `invalid_reason`;", $ids);
+  $narrower = termsGroupedBy("broader", "SELECT * FROM `terms` WHERE `broader` IN (%s) AND `invalid_reason` IS NULL ORDER BY `shortname`;", $ids);
+  $broader  = termsGroupedBy("id", "SELECT * FROM `terms` WHERE `id` IN (%s) AND `invalid_reason` IS NULL;", $broaderIds);
+
   $out = array();
   foreach ($ret as $row) {
-    $sql = "SELECT * FROM `terms` WHERE `parent` = ? ORDER BY `invalid_reason`;";
-    $result = dbQuery($sql, array($row["id"]));
-    if ($result) {
-      $row["children"] = $result->fetch_all(MYSQLI_ASSOC);
-      $result->close();
-    }
-    $sql = "SELECT * FROM `terms` WHERE `broader` = ? AND `invalid_reason` IS NULL ORDER BY `shortname`;";
-    $result = dbQuery($sql, array($row["id"]));
-    if ($result) {
-      $row["narrower"] = $result->fetch_all(MYSQLI_ASSOC);
-      $result->close();
-    }
+    $row["children"] = isset($children[$row["id"]]) ? $children[$row["id"]] : array();
+    $row["narrower"] = isset($narrower[$row["id"]]) ? $narrower[$row["id"]] : array();
     if ($row["broader"] != "") {
-      $sql = "SELECT * FROM `terms` WHERE `id` = ? AND `invalid_reason` IS NULL;";
-      $result = dbQuery($sql, array($row["broader"]));
-      if ($result) {
-        $row["broader"] = $result->fetch_all(MYSQLI_ASSOC);
-        $result->close();
-      }
+      $row["broader"] = isset($broader[$row["broader"]]) ? $broader[$row["broader"]] : array();
     }
-  $out[] = $row;
+    $out[] = $row;
   }
   return($out);
 }
 
+//Run a query for terms matching a list of ids, grouped by one of their columns.
+//$sql must contain a single %s where the id placeholders go.
+function termsGroupedBy($column, $sql, $ids) {
+  $grouped = array();
+  if (count($ids) == 0) {
+    return($grouped);
+  }
+  $placeholders = implode(", ", array_fill(0, count($ids), "?"));
+  $result = dbQuery(sprintf($sql, $placeholders), $ids);
+  if ($result) {
+    foreach ($result->fetch_all(MYSQLI_ASSOC) as $term) {
+      $grouped[$term[$column]][] = $term;
+    }
+    $result->close();
+  }
+  return($grouped);
+}
+
 function term2URI($term, $link=FALSE) {
-  $out = "https://".$GLOBALS["ontomasticon"]["config"]["base_url"];
+  $out = siteURL();
   if ($term['cv'] == null) {
     if ($term["opaque"] == 0) {
       $out .= $term["shortname"];
@@ -96,7 +118,38 @@ function termID($shortname) {
   return(null);
 }
 
+//Look up the shortname of a term from its id, or NULL if there is no match
+function termShortname($id) {
+  if ($id === null || $id === "") {
+    return(null);
+  }
+  $result = dbQuery("SELECT `shortname` FROM `terms` WHERE `id` = ?;", array($id));
+  if ($result && $row = $result->fetch_assoc()) {
+    return($row["shortname"]);
+  }
+  return(null);
+}
+
+//Look up the ids of the parent and broader terms named in a term form.
+//Prints an error and returns NULL if a named term doesn't exist.
+function termRelations() {
+  $ids = array();
+  foreach (array("parent", "broader") as $field) {
+    $shortname = trim($_POST[$field]);
+    $ids[$field] = ($shortname == "") ? null : termID($shortname);
+    if ($shortname != "" && $ids[$field] === null) {
+      printError(t("Not saved. There is no term with the short name")." ".$shortname);
+      return(null);
+    }
+  }
+  return($ids);
+}
+
 function editTerm() {
+  $relations = termRelations();
+  if ($relations === null) {
+    return(FALSE);
+  }
   $shortname = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
   $name = trim($_POST['name']);
   $description = trim($_POST['description']);
@@ -104,41 +157,50 @@ function editTerm() {
   $opaque = (isset($_POST["opaque"]) ? 1 : 0);
   $cv = ((!isset($_POST["cv"]) || $_POST["cv"]=="none") ? "" : trim($_POST['cv']));
   $invalid = ((!isset($_POST["invalid"]) || $_POST["invalid"]=="none") ? "" : trim($_POST['invalid']));
-  $parent = ($_POST["parent"] != "") ? termID(trim($_POST['parent'])) : null;
-  $broader = ($_POST["broader"] != "") ? termID(trim($_POST['broader'])) : null;
   $reference = trim($_POST['reference']);
 
   $sql  = "UPDATE `terms` SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, ";
   $sql .= "`invalid_reason` = ?, `cv` = ?, `parent` = ?, `broader` = ?, `reference` = ? ";
   $sql .= "WHERE `shortname` = ?;";
-  dbQuery($sql, array(
+  return(reportSaved(dbQuery($sql, array(
     $name,
     $description,
     $language,
     $opaque,
     ($invalid == "") ? null : $invalid,
     ($cv == "") ? null : $cv,
-    $parent,
-    $broader,
+    $relations["parent"],
+    $relations["broader"],
     $reference,
     $shortname
-  ));
+  ))));
 }
 
 function addTerm() {
   $shortname = trim($_POST['shortname']);
+  if ($shortname == "") {
+    printError(t("Not saved. A short name is required."));
+    return(FALSE);
+  }
+  if (termID($shortname) !== null) {
+    printError(t("Not saved. There is already a term with the short name")." ".$shortname);
+    return(FALSE);
+  }
+  $relations = termRelations();
+  if ($relations === null) {
+    return(FALSE);
+  }
   $name = trim($_POST['name']);
   $description = trim($_POST['description']);
   $language = trim($_POST['language']);
   $opaque = (isset($_POST["opaque"]) ? 1 : 0);
   $cv = ((!isset($_POST["cv"]) || $_POST["cv"]=="none") ? "" : trim($_POST['cv']));
   $invalid = ((!isset($_POST["invalid"]) || $_POST["invalid"]=="none") ? "" : trim($_POST['invalid']));
-  $parent = ($_POST["parent"] != "") ? termID(trim($_POST['parent'])) : null;
-  $broader = ($_POST["broader"] != "") ? termID(trim($_POST['broader'])) : null;
+  $reference = trim($_POST['reference']);
 
-  $sql  = "INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`, `invalid_reason`, `cv`, `parent`, `broader`) ";
-  $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
-  dbQuery($sql, array(
+  $sql  = "INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`) ";
+  $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+  return(reportSaved(dbQuery($sql, array(
     $shortname,
     $name,
     $description,
@@ -146,12 +208,30 @@ function addTerm() {
     $opaque,
     ($invalid == "") ? null : $invalid,
     ($cv == "") ? null : $cv,
-    $parent,
-    $broader
-  ));
+    $relations["parent"],
+    $relations["broader"],
+    $reference
+  )), "Term added."));
 }
 
 function deleteTerm() {
-  $sn = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
-  dbQuery("DELETE FROM `terms` WHERE `shortname` = ?;", array($sn));
+  global $db;
+  $id = termID($GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"]);
+  if ($id === null) {
+    printError(t("No matching term found"));
+    return(FALSE);
+  }
+  //Unlink terms that refer to this one, so they don't point at a missing term
+  $db->begin_transaction();
+  $ok = dbQuery("UPDATE `terms` SET `parent` = NULL WHERE `parent` = ?;", array($id))
+    && dbQuery("UPDATE `terms` SET `broader` = NULL WHERE `broader` = ?;", array($id))
+    && dbQuery("DELETE FROM `terms` WHERE `id` = ?;", array($id));
+  if ($ok) {
+    $db->commit();
+    return(TRUE);
+  }
+  $error = dbError();
+  $db->rollback();
+  printError(t("Could not delete").": ".$error);
+  return(FALSE);
 }

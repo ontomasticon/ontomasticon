@@ -2,8 +2,11 @@
 // Ontomasticon: a simple, lightweight, PHP-based ontology browser.
 // Department of Information Retrieval
 
-//Codebase version
-$version = 0.2;
+//Codebase version. Installs before 0.3 can only read an unquoted number here when checking for updates.
+$version = 0.3;
+
+//Query results are checked where they are used, so stop mysqli throwing exceptions (the default from PHP 8.1)
+mysqli_report(MYSQLI_REPORT_OFF);
 
 //Check database has been configured
 if (file_exists("settings/db.php")) {
@@ -14,6 +17,11 @@ if (file_exists("settings/db.php")) {
   exit;
 }
 
+if ($db->connect_error) {
+  print("<p>Could not connect to the database.</p>");
+  exit;
+}
+
 // Load core functions
 require("core/core.php");
 
@@ -21,7 +29,7 @@ require("core/core.php");
 session_start(array(
   "cookie_httponly" => TRUE,
   "cookie_samesite" => "Lax",
-  "cookie_secure" => (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] != "off"),
+  "cookie_secure" => requestIsHttps(),
   "use_strict_mode" => TRUE
 ));
 

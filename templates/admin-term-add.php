@@ -35,7 +35,7 @@ if (!userAllow("edit-terms")) {
         value="<?php print h($CV["shortname"]); ?>">
       <label for="<?php print h($CV["shortname"]); ?>"><?php print h($CV["name"]); ?></label><br/>
     <?php }
-    print "<br/"; ?>
+    print "<br/>"; ?>
     <label for="none"><?php print t("Invalidity"); ?></label><br/>
     <input type="radio" id="none" name="invalid" value="none">
     <label for="none"><?php print t("None"); ?></label><br>
@@ -47,6 +47,10 @@ if (!userAllow("edit-terms")) {
            <br/><br/>
     <label for="broader"><?php print t("Broader term"); ?></label><br/>
     <input type="text" id="broader" name="broader"
+           placeholder="">
+           <br/><br/>
+    <label for="reference"><?php print t("Reference"); ?></label><br/>
+    <input type="text" id="reference" name="reference"
            placeholder="">
            <br/><br/>
     <button type="submit" name="submit"><?php print t("Save"); ?></button>

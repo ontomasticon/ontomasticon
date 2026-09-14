@@ -27,6 +27,7 @@ CREATE TABLE `terms` (
   `parent` int(11) DEFAULT NULL,
   `invalid_reason` varchar(45) DEFAULT NULL,
   `broader` int(11) DEFAULT NULL,
+  `reference` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
   UNIQUE KEY `shortname_UNIQUE` (`shortname`)
@@ -40,11 +41,23 @@ CREATE TABLE `users` (
   `email` varchar(255) DEFAULT NULL,
   `password` varchar(255) DEFAULT NULL,
   `role` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email_UNIQUE` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO config VALUES('version_db', 0.1);
-INSERT INTO config VALUES('version', 0.1);
+DROP TABLE IF EXISTS `login_attempts`;
+CREATE TABLE `login_attempts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) DEFAULT NULL,
+  `ip` varchar(45) DEFAULT NULL,
+  `attempted` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `email_attempted` (`email`, `attempted`),
+  KEY `ip_attempted` (`ip`, `attempted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO config VALUES('version_db', '0.3');
+INSERT INTO config VALUES('version', '0.3');
 INSERT INTO config VALUES('mode', 'production');
 INSERT INTO config VALUES('default_lang', 'en');
 INSERT INTO config VALUES('description', 'Description goes here.');

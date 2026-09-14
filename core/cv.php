@@ -59,9 +59,10 @@ function editCV() {
   $reference = trim($_POST['reference']);
 
   $sql = "UPDATE `cv` SET `name` = ?, `description` = ?, `reference` = ? WHERE `shortname` = ?;";
-  dbQuery($sql, array($name, $description, $reference, $CV));
+  $ok = reportSaved(dbQuery($sql, array($name, $description, $reference, $CV)));
 
   $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
+  return($ok);
 }
 
 function addCV() {
@@ -71,15 +72,39 @@ function addCV() {
   $description = trim($_POST['description']);
   $reference = trim($_POST['reference']);
 
+  if ($shortname == "") {
+    printError(t("Not saved. A short name is required."));
+    return(FALSE);
+  }
+  $existing = dbQuery("SELECT `shortname` FROM `cv` WHERE `shortname` = ?;", array($shortname));
+  if ($existing && $existing->num_rows > 0) {
+    printError(t("Not saved. There is already a controlled vocabulary with the short name")." ".$shortname);
+    return(FALSE);
+  }
+
   $sql = "INSERT INTO `cv` (`shortname`, `name`, `description`, `reference`) VALUES (?, ?, ?, ?);";
-  dbQuery($sql, array($shortname, $name, $description, $reference));
+  $ok = reportSaved(dbQuery($sql, array($shortname, $name, $description, $reference)), "Controlled vocabulary added.");
 
   $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
+  return($ok);
 }
 
 function deleteCV() {
+  global $db;
   $CV = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
 
-  dbQuery("DELETE FROM `terms` WHERE `cv` = ?;", array($CV));
-  dbQuery("DELETE FROM `cv` WHERE `shortname` = ?;", array($CV));
+  $db->begin_transaction();
+  //Unlink terms elsewhere that refer to this vocabulary's terms, so they don't point at missing terms
+  $ok = dbQuery("UPDATE `terms` AS `t` JOIN `terms` AS `d` ON `t`.`parent` = `d`.`id` SET `t`.`parent` = NULL WHERE `d`.`cv` = ?;", array($CV))
+    && dbQuery("UPDATE `terms` AS `t` JOIN `terms` AS `d` ON `t`.`broader` = `d`.`id` SET `t`.`broader` = NULL WHERE `d`.`cv` = ?;", array($CV))
+    && dbQuery("DELETE FROM `terms` WHERE `cv` = ?;", array($CV))
+    && dbQuery("DELETE FROM `cv` WHERE `shortname` = ?;", array($CV));
+  if ($ok) {
+    $db->commit();
+    return(TRUE);
+  }
+  $error = dbError();
+  $db->rollback();
+  printError(t("Could not delete").": ".$error);
+  return(FALSE);
 }
