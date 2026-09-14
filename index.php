@@ -22,6 +22,10 @@ if ($db->connect_error) {
   exit;
 }
 
+//Exchange text with the database as UTF-8, whatever the server's default character set.
+//Otherwise characters such as curly quotes can come back as invalid UTF-8.
+$db->set_charset("utf8mb4");
+
 // Load core functions
 require("core/core.php");
 

@@ -125,6 +125,22 @@ $term = json_decode($body, TRUE);
 checkSame("finds an opaque term from the id in its URL", "opaque_term", is_array($term) ? $term["shortname"] : null);
 list(, , $body) = httpRequest("GET", "/api/term/?term=".rawurlencode("https://glossary.example.org/1"));
 checkSame("doesn't find a term that isn't opaque by its id", "null", $body);
+$db->query("INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`) VALUES ('agreement_song', 'Agreement song', 'The female’s response', 'en', 0);");
+list(, , $body) = httpRequest("GET", "/api/term/?shortname=agreement_song");
+$term = json_decode($body, TRUE);
+checkSame("returns curly quotes intact", "The female’s response", is_array($term) ? $term["description"] : null);
+
+section("HTTP: JSON-LD");
+list($status, $headers, $body) = httpRequest("GET", "/api/term/?shortname=acoustic_allometry&format=jsonld");
+$concept = json_decode($body, TRUE);
+check("returns JSON-LD", $status == 200 && hasHeader($headers, '#^Content-Type: application/ld\+json#i'));
+checkSame("identifies the term by its URI", "https://glossary.example.org/acoustic_allometry", is_array($concept) ? $concept["@id"] : null);
+checkSame("describes the term as a SKOS concept", "skos:Concept", is_array($concept) ? $concept["@type"] : null);
+list(, , $body) = httpRequest("GET", "/api/term/?term=".rawurlencode("https://glossary.example.org/2")."&format=jsonld");
+$concept = json_decode($body, TRUE);
+checkSame("finds an opaque term from its URL", "https://glossary.example.org/2", is_array($concept) ? $concept["@id"] : null);
+list($status, , $body) = httpRequest("GET", "/api/term/?shortname=missing&format=jsonld");
+check("a missing term is not found", $status == 404 && $body == "null");
 
 section("HTTP: logging in and forms");
 list(, , $body) = httpRequest("GET", "/user/login");

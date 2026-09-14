@@ -9,6 +9,20 @@ function h($s) {
   return(htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'));
 }
 
+//Text from stored HTML, for formats that can't contain HTML: tags are removed, entities
+//decoded, and runs of whitespace (including between paragraphs) become single spaces
+function plainText($html) {
+  $text = preg_replace('#<(br|/?(p|div|li|ul|ol|h[1-6]|tr|td|th|table|blockquote))\b[^>]*>#i', ' ', (string)$html);
+  $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, "UTF-8");
+  return(trim(preg_replace('/\s+/', ' ', $text)));
+}
+
+//A value as JSON. Bytes that aren't valid UTF-8 are replaced, because json_encode()
+//would otherwise return FALSE and the response would be empty.
+function toJSON($value, $flags = 0) {
+  return(json_encode($value, $flags | JSON_INVALID_UTF8_SUBSTITUTE));
+}
+
 //Escaped address for a form that posts back to the current page. Uses the address
 //the visitor requested, as PHP_SELF is /index.php under most rewrite configurations.
 function formAction() {

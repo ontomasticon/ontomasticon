@@ -130,3 +130,67 @@ check("nobody but admin can delete vocabularies",
   !in_array("delete-cv", $roles["editor"]["tasks"]) && !in_array("delete-cv", $roles["create-cv"]["tasks"]));
 checkSame("an unknown role has no name", "None", roleName("nonsense"));
 check("the role dropdown marks the current role", strpos(roleSelect("editor"), "value='editor' selected") !== FALSE);
+
+section("Plain text from HTML");
+checkSame("removes tags and decodes entities", "Pulses & echemes", plainText("<b>Pulses</b> &amp; echemes"));
+checkSame("separates paragraphs with a space", "First. Second.", plainText("<p>First.</p>\r\n\r\n<p>Second.</p>"));
+checkSame("keeps escaped angle brackets as text", "a <b> tag", plainText("a &lt;b&gt; tag"));
+checkSame("NULL gives an empty string", "", plainText(null));
+
+section("JSON output");
+if (!function_exists("json_encode")) {
+  print "  JSON tests skipped: this PHP doesn't have the json extension.\n";
+} else {
+  checkSame("encodes values as JSON", '{"a":"b\/c"}', toJSON(array("a" => "b/c")));
+  checkSame("replaces invalid UTF-8 instead of returning nothing", "female\xEF\xBF\xBDs", json_decode(toJSON("female\x92s")));
+}
+
+section("JSON-LD");
+//A term with its relations set, so the database isn't needed
+function testTerm($row, $related = array()) {
+  $term = Term::fromRow($row + array("language" => "en", "opaque" => 0));
+  foreach (array("broader" => null, "parent" => null, "narrower" => array(), "children" => array()) as $relation => $none) {
+    $term->setRelated($relation, array_key_exists($relation, $related) ? $related[$relation] : $none);
+  }
+  return($term);
+}
+$premating = testTerm(array("id" => 2, "shortname" => "PrematingSong", "name" => "Premating Song", "cv" => "callType"));
+$song = testTerm(array("id" => 1, "shortname" => "AgreementSong", "name" => "Agreement Song", "cv" => "callType", "broader" => 2,
+  "description" => "<p>The female&rsquo;s response.</p>", "reference" => "Ragge and Reynolds 1998"), array("broader" => $premating));
+$synonym = testTerm(array("id" => 3, "shortname" => "AttractionSong", "name" => "Attraction Song", "cv" => "callType",
+  "parent" => 1, "invalid_reason" => "Synonym"), array("parent" => $song));
+$response = testTerm(array("id" => 4, "shortname" => "ResponseCall", "name" => "Response Call", "cv" => "callType", "parent" => 1),
+  array("parent" => $song));
+$song->setRelated("children", array($synonym, $response));
+
+$ld = termJSONLD($song);
+checkSame("identifies a term in a vocabulary by its URI", "https://glossary.example.org/cv/callType#AgreementSong", $ld["@id"]);
+checkSame("describes it as a SKOS concept", "skos:Concept", $ld["@type"]);
+checkSame("declares the prefixes it uses", "http://www.w3.org/2004/02/skos/core#", $ld["@context"]["skos"]);
+checkSame("labels it in its language", array("@value" => "Agreement Song", "@language" => "en"), $ld["skos:prefLabel"]);
+checkSame("repeats the label as rdfs:label, which TDWG requires", $ld["skos:prefLabel"], $ld["rdfs:label"]);
+checkSame("uses the shortname as the controlled value", "AgreementSong", $ld["rdf:value"]);
+checkSame("gives the definition as plain text", array("@value" => "The female’s response.", "@language" => "en"), $ld["skos:definition"]);
+checkSame("repeats the definition as rdfs:comment, which TDWG requires", $ld["skos:definition"], $ld["rdfs:comment"]);
+checkSame("puts it in its vocabulary's scheme", array("@id" => "https://glossary.example.org/cv/callType"), $ld["skos:inScheme"]);
+checkSame("links its broader term", array("@id" => "https://glossary.example.org/cv/callType#PrematingSong"), $ld["skos:broader"]);
+check("a term with a broader term isn't a top concept", !isset($ld["skos:topConceptOf"]));
+checkSame("gives synonyms as alternative labels", array(array("@value" => "Attraction Song", "@language" => "en")), $ld["skos:altLabel"]);
+checkSame("links other child terms as related", array(array("@id" => "https://glossary.example.org/cv/callType#ResponseCall")), $ld["skos:related"]);
+check("a valid term isn't deprecated", !isset($ld["owl:deprecated"]));
+checkSame("gives a text reference as a citation", "Ragge and Reynolds 1998", $ld["dcterms:bibliographicCitation"]);
+
+$ld = termJSONLD($synonym);
+checkSame("a synonym is deprecated", TRUE, $ld["owl:deprecated"]);
+checkSame("and replaced by the term it is a synonym of", array("@id" => "https://glossary.example.org/cv/callType#AgreementSong"), $ld["dcterms:isReplacedBy"]);
+check("but not related to that term", !isset($ld["skos:related"]));
+check("and isn't a top concept", !isset($ld["skos:topConceptOf"]));
+checkSame("a child term that isn't a synonym is related to its parent", array(array("@id" => "https://glossary.example.org/cv/callType#AgreementSong")), termJSONLD($response)["skos:related"]);
+
+$ld = termJSONLD(testTerm(array("id" => 5, "shortname" => "acoustic_allometry", "name" => "acoustic allometry",
+  "description" => "", "language" => "", "reference" => "https://doi.org/10.1000/example")));
+checkSame("a term outside a vocabulary is in the site's scheme", array("@id" => "https://glossary.example.org/"), $ld["skos:inScheme"]);
+checkSame("and is a top concept of it", $ld["skos:inScheme"], $ld["skos:topConceptOf"]);
+checkSame("a term without a language has a plain label", "acoustic allometry", $ld["skos:prefLabel"]);
+check("an empty description gives no definition", !isset($ld["skos:definition"]) && !isset($ld["rdfs:comment"]));
+checkSame("gives a web address reference as a source", array("@id" => "https://doi.org/10.1000/example"), $ld["dcterms:source"]);
