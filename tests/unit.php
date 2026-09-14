@@ -102,6 +102,26 @@ checkSame("API endpoint", array("page_type" => "api", "active_page" => "term"), 
 checkSame("other files in settings/ go to the home page", array("page_type" => "home"), routeFor("/settings/db.php"));
 checkSame("a term's own address, ignoring the query string",
   array("page_type" => "term", "active_page" => "acoustic_allometry"), routeFor("/acoustic_allometry?lang=fr"));
+$routedElsewhere = array_values(array_filter(reservedRouteSegments(), function($segment) {
+  return(routeFor("/".$segment."/")["page_type"] != "term");
+}));
+checkSame("reserved route segments don't go to a term's page", reservedRouteSegments(), $routedElsewhere);
+$routing = new ReflectionFunction("activePage");
+$routingSource = array_slice(file($routing->getFileName()), $routing->getStartLine() - 1, $routing->getEndLine() - $routing->getStartLine() + 1);
+preg_match_all('/case "([^"]+)":/', implode("", $routingSource), $cases);
+$routes = $cases[1];
+sort($routes);
+$segments = reservedRouteSegments();
+sort($segments);
+checkSame("and they are all of the routes in activePage()", $routes, $segments);
+
+section("Reserved short names");
+check("route segments", reservedTermShortname("api") && reservedTermShortname("settings"));
+check("files and directories at the top of the install",
+  reservedTermShortname("index.php") && reservedTermShortname("README.md") && reservedTermShortname("css") && reservedTermShortname("inst"));
+check("in any case", reservedTermShortname("CSS") && reservedTermShortname("Admin"));
+check("names ending in .php, which nginx passes to PHP", reservedTermShortname("glossary.php"));
+check("but not other names", !reservedTermShortname("sound") && !reservedTermShortname("apis") && !reservedTermShortname("php"));
 
 section("Content negotiation");
 function formatFor($accept, $get = array()) {

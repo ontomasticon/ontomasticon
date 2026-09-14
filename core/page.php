@@ -70,6 +70,11 @@ function activePage() {
   return($ret);
 }
 
+//The first path segments that activePage() sends somewhere other than a term's page. Keep this in step with its cases.
+function reservedRouteSegments() {
+  return(array("api", "cv", "ping", "update", "user", "admin", "settings"));
+}
+
 //The RDF format asked for with ?format=: "jsonld" for format=jsonld, "turtle" for format=ttl, otherwise NULL
 function formatParameter() {
   $formats = array("jsonld" => "jsonld", "ttl" => "turtle");

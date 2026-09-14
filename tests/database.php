@@ -91,6 +91,21 @@ check("including one with characters that mean something in URIs", !$ok && termR
 termForm(array("shortname" => "song", "parent" => "missing"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("refuses a parent term that doesn't exist", !$ok && strpos($out, "no term with the short name") !== FALSE && termRow("song") == null);
+termForm(array("shortname" => "api", "name" => "API"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("refuses a short name outside a vocabulary that the site uses for its own pages", !$ok && strpos($out, "own pages or files") !== FALSE && termRow("api") == null);
+foreach (array("css", "README.md", "Admin", "glossary.php") as $reserved) {
+  termForm(array("shortname" => $reserved, "name" => $reserved));
+  list($out, $ok) = capture(function() { return(addTerm()); });
+  check("or for its files and directories, in any case, or names ending in .php: ".$reserved, !$ok && termRow($reserved) == null);
+}
+termForm(array("shortname" => "user", "name" => "User", "opaque" => "opaque"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("but allows one for an opaque term, whose URI uses its id", $ok && termRow("user") != null);
+dbQuery("DELETE FROM `terms` WHERE `shortname` = 'user';");
+termForm(array("shortname" => "42", "name" => "Forty-two"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("refuses a short name made only of digits, which could share a URI with an opaque term's id", !$ok && strpos($out, "only of digits") !== FALSE && termRow("42") == null);
 termForm(array("shortname" => "bird_song", "name" => "Bird song", "parent" => "sound", "reference" => "Smith 2020"));
 capture(function() { return(addTerm()); });
 termForm(array("shortname" => "animal_sound", "name" => "Animal sound", "broader" => "sound"));
@@ -187,6 +202,35 @@ checkSame("with its terms", array("robin"), $shortnames($birdTerms));
 checkSame("and their child terms, even outside the vocabulary", array("wren_song"), (count($birdTerms) > 0) ? $shortnames($birdTerms[0]->children()) : null);
 checkSame("its JSON-LD scheme is at the vocabulary's address", "https://glossary.example.org/cv/birds",
   ($birds != null) ? vocabularyJSONLD($birds, $birdTerms)["@graph"][0]["@id"] : null);
+termForm(array("shortname" => "api", "name" => "API", "cv" => "birds"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("allows a term in a vocabulary to use a short name the site uses for its own pages", $ok && termRow("api") != null);
+termForm(array("shortname" => "1990", "name" => "1990", "cv" => "birds", "opaque" => "opaque"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("and an opaque term to use a short name made only of digits", $ok && termRow("1990") != null);
+termForm(array("shortname" => "1991", "name" => "1991", "cv" => "birds"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("but not a term in a vocabulary that isn't opaque, as its fragment could match an id", !$ok && termRow("1991") == null);
+$GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "api";
+termForm(array("name" => "Moved", "cv" => "none"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("editing refuses to move a term out of its vocabulary when the site uses its short name",
+  !$ok && strpos($out, "own pages or files") !== FALSE && termRow("api")["cv"] == "birds" && termRow("api")["name"] == "API");
+termForm(array("name" => "Application programming interface", "cv" => "birds"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("but saves other changes to it", $ok && termRow("api")["name"] == "Application programming interface");
+dbQuery("UPDATE `terms` SET `cv` = NULL WHERE `shortname` = 'api';");
+termForm(array("name" => "API", "cv" => "none"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("still edits a term saved outside a vocabulary before short names were checked", $ok && termRow("api")["name"] == "API");
+termForm(array("name" => "API", "cv" => "birds"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("and can move it into a vocabulary", $ok && termRow("api")["cv"] == "birds");
+$GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "1990";
+termForm(array("name" => "1990", "cv" => "birds"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("editing refuses to make a term whose short name is made only of digits not opaque",
+  !$ok && strpos($out, "only of digits") !== FALSE && termRow("1990")["opaque"] == 1);
 $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "birds";
 list($out, $ok) = capture(function() { return(deleteCV()); });
 check("deletes the vocabulary and its terms", $ok && !array_key_exists("birds", getCVs()) && termRow("robin") == null);

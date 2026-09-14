@@ -138,6 +138,36 @@ function termRelations() {
   return($ids);
 }
 
+//Whether a term outside a vocabulary with this shortname would have a URI that never reaches the term's page:
+//one whose first path segment activePage() routes elsewhere, a file or directory at the top of the install (which
+//the web server serves or forbids rather than passing to index.php), or a name ending in .php (which
+//nginx.conf.example passes to PHP rather than to index.php). Compared without case, as some file systems ignore it.
+function reservedTermShortname($shortname) {
+  $name = strtolower($shortname);
+  if (substr($name, -4) == ".php") {
+    return(TRUE);
+  }
+  $files = scandir(dirname(__DIR__));
+  $reserved = array_merge(reservedRouteSegments(), ($files === FALSE) ? array() : $files);
+  return(in_array($name, array_map("strtolower", $reserved), TRUE));
+}
+
+//The error explaining why a term can't have a shortname with the vocabulary and opaque setting it would be
+//saved with, or NULL if it can. Opaque terms are named by their id in URIs, so their shortname is never a problem.
+function termShortnameClash($shortname, $cv, $opaque) {
+  if ($opaque) {
+    return(null);
+  }
+  //Term::findByURI() reads a final segment of digits as a possible id, so "42" would share a URI with opaque term 42
+  if (preg_match('/^[0-9]+$/D', $shortname) === 1) {
+    return(t("Not saved. A short name made only of digits can only be used for an opaque term, as it could be mistaken for another term's id."));
+  }
+  if ($cv == "" && reservedTermShortname($shortname)) {
+    return(t("Not saved. The site's own pages or files already use this address, so the short name can only be used for a term in a controlled vocabulary or an opaque term:")." ".$shortname);
+  }
+  return(null);
+}
+
 function editTerm() {
   $relations = termRelations();
   if ($relations === null) {
@@ -151,6 +181,14 @@ function editTerm() {
   $cv = ((!isset($_POST["cv"]) || $_POST["cv"]=="none") ? "" : trim($_POST['cv']));
   $invalid = ((!isset($_POST["invalid"]) || $_POST["invalid"]=="none") ? "" : trim($_POST['invalid']));
   $reference = trim($_POST['reference']);
+  //Moving a term out of a vocabulary, or making it not opaque, can give it a URI it can't use. A term saved with
+  //such a URI before this was checked can still be edited, as long as the edit doesn't add a different problem.
+  $current = getTerm($shortname);
+  $clash = termShortnameClash($shortname, $cv, $opaque);
+  if ($current != null && $clash !== null && $clash !== termShortnameClash($shortname, $current["cv"], $current["opaque"])) {
+    printError($clash);
+    return(FALSE);
+  }
 
   $sql  = "UPDATE `terms` SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, ";
   $sql .= "`invalid_reason` = ?, `cv` = ?, `parent` = ?, `broader` = ?, `reference` = ? ";
@@ -194,6 +232,11 @@ function addTerm() {
   $cv = ((!isset($_POST["cv"]) || $_POST["cv"]=="none") ? "" : trim($_POST['cv']));
   $invalid = ((!isset($_POST["invalid"]) || $_POST["invalid"]=="none") ? "" : trim($_POST['invalid']));
   $reference = trim($_POST['reference']);
+  $clash = termShortnameClash($shortname, $cv, $opaque);
+  if ($clash !== null) {
+    printError($clash);
+    return(FALSE);
+  }
 
   $sql  = "INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`) ";
   $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
