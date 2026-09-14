@@ -53,7 +53,9 @@ class Term {
     if ($name === "") {
       return(null);
     }
-    foreach (array(Term::find($name), ctype_digit($name) ? Term::findByID($name) : null) as $term) {
+    //preg_match rather than ctype_digit, as the ctype extension isn't always available
+    $byID = (preg_match('/^[0-9]+$/D', $name) === 1) ? Term::findByID($name) : null;
+    foreach (array(Term::find($name), $byID) as $term) {
       if ($term != null && $term->uri() === $uri) {
         return($term);
       }
