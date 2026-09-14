@@ -1,5 +1,7 @@
 <?php
-header('Content-Type: application/json; charset=utf-8');
+//format=jsonld returns the term as a SKOS concept in JSON-LD; otherwise the term's database row is returned
+$jsonld = (isset($_GET["format"]) && $_GET["format"] == "jsonld");
+header(($jsonld) ? 'Content-Type: application/ld+json; charset=utf-8' : 'Content-Type: application/json; charset=utf-8');
 $term = null;
 if (isset($_GET["term"])) {
   //Term URLs are https://host/name or https://host/cv/cv_name#name, where
@@ -25,6 +27,16 @@ if (isset($_GET["term"])) {
    $term = getTerm($_GET["shortname"]);
 }
 
+if ($jsonld) {
+  if ($term == null) {
+    http_response_code(404);
+    print("null");
+  } else {
+    print(toJSON(termJSONLD(Term::findByID($term["id"])), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+  }
+  exit;
+}
+
 if ($term != null) {
   $term["url"] = term2URI($term);
   //Values are returned as strings, as they were before the database code used prepared statements
@@ -35,5 +47,5 @@ if ($term != null) {
   }
 }
 
-print(($term == null) ? "null" : json_encode($term));
+print(($term == null) ? "null" : toJSON($term));
 exit;

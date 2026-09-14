@@ -91,21 +91,9 @@ function termsGroupedBy($column, $sql, $ids) {
   return($grouped);
 }
 
+//The URI of a term given as a row of the terms table, or a link to it
 function term2URI($term, $link=FALSE) {
-  $out = siteURL();
-  if ($term['cv'] == null) {
-    if ($term["opaque"] == 0) {
-      $out .= $term["shortname"];
-    } else {
-      $out .= $term["id"];
-    }
-  } else {
-    if ($term["opaque"] == 0 ) {
-      $out .= "cv/".$term["cv"]."#".$term["shortname"];
-    } else {
-      $out .= "cv/".$term["cv"]."#".$term["id"];
-    }
-  }
+  $out = Term::fromRow($term)->uri();
   return(($link) ? l($out, $out) : $out);
 }
 

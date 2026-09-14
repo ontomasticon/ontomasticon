@@ -109,6 +109,23 @@ $term = getTerm("animal_sound");
 checkSame("getTerm() gives the broader term's short name", "sound", $term["broader"]);
 checkSame("getTermByID() finds the same term", "animal_sound", getTermByID($term["id"])["shortname"]);
 
+section("Term objects");
+$shortnames = function($terms) {
+  return(array_map(function($term) { return($term->shortname); }, $terms));
+};
+$sound = Term::find("sound");
+checkSame("Term::find() loads a term", "Sound", ($sound != null) ? $sound->name : null);
+checkSame("Term::find() gives NULL for a missing term", null, Term::find("missing"));
+checkSame("Term::findByID() finds the same term", "sound", Term::findByID($sound->id)->shortname);
+checkSame("loads the narrower terms", array("animal_sound"), $shortnames($sound->narrower()));
+checkSame("loads the child terms", array("bird_song"), $shortnames($sound->children()));
+checkSame("loads the broader term", "sound", Term::find("animal_sound")->broader()->shortname);
+checkSame("loads the parent term", "sound", Term::find("bird_song")->parent()->shortname);
+checkSame("a term without a broader term has none", null, $sound->broader());
+$ld = termJSONLD($sound);
+checkSame("JSON-LD links the narrower terms", array(array("@id" => "https://glossary.example.org/animal_sound")), $ld["skos:narrower"]);
+checkSame("and the child terms as related", array(array("@id" => "https://glossary.example.org/bird_song")), $ld["skos:related"]);
+
 section("Editing terms");
 $GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "admin", "active_page" => "term", "active_subpage" => "edit", "active_subsubpage" => "bird_song");
 termForm(array("name" => "Birdsong", "parent" => "sound", "reference" => "Jones 2021"));

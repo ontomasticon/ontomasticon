@@ -12,4 +12,6 @@ require("core/util.php");
 require("core/page.php");
 require("core/cv.php");
 require("core/terms.php");
+require("core/model.php");
+require("core/jsonld.php");
 require("core/language.php");

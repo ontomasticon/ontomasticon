@@ -17,5 +17,11 @@
 
     <h4>/api/term/?shortname=</h4>
     <p>Given a term name returns a JSON term object.</p>
+
+    <h4>&amp;format=jsonld</h4>
+    <p>
+        Add to either endpoint to return the term as a SKOS concept in JSON-LD, including the
+        properties TDWG requires of controlled vocabulary terms.
+    </p>
   </div>
 </div>
