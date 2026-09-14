@@ -46,6 +46,21 @@ class Term {
     return(Term::loadOne("`id` = ?", array($id)));
   }
 
+  //The term a URI identifies, or NULL if it isn't exactly the URI of a term. The URI ends
+  //with the term's shortname, or its id if the term is opaque.
+  public static function findByURI($uri) {
+    $name = preg_replace('#^.*[/\#]#', '', $uri);
+    if ($name === "") {
+      return(null);
+    }
+    foreach (array(Term::find($name), ctype_digit($name) ? Term::findByID($name) : null) as $term) {
+      if ($term != null && $term->uri() === $uri) {
+        return($term);
+      }
+    }
+    return(null);
+  }
+
   //The terms in a vocabulary, including deprecated ones. A NULL shortname gives the site's
   //terms that aren't in a vocabulary.
   public static function inVocabulary($shortname) {

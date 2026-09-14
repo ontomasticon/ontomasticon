@@ -122,6 +122,11 @@ checkSame("loads the child terms", array("bird_song"), $shortnames($sound->child
 checkSame("loads the broader term", "sound", Term::find("animal_sound")->broader()->shortname);
 checkSame("loads the parent term", "sound", Term::find("bird_song")->parent()->shortname);
 checkSame("a term without a broader term has none", null, $sound->broader());
+checkSame("Term::findByURI() finds a term from its URI", "sound",
+  (Term::findByURI("https://glossary.example.org/sound") != null) ? Term::findByURI("https://glossary.example.org/sound")->shortname : null);
+checkSame("but not from another address ending in its name", null, Term::findByURI("https://glossary.example.org/cv/birds#sound"));
+checkSame("nor from its id when it isn't opaque", null, Term::findByURI("https://glossary.example.org/".$sound->id));
+checkSame("and gives NULL for a missing term", null, Term::findByURI("https://glossary.example.org/missing"));
 $ld = termJSONLD($sound);
 checkSame("JSON-LD links the narrower terms", array(array("@id" => "https://glossary.example.org/animal_sound")), $ld["skos:narrower"]);
 checkSame("and the child terms as related", array(array("@id" => "https://glossary.example.org/bird_song")), $ld["skos:related"]);

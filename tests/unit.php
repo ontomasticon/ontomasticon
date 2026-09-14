@@ -86,6 +86,44 @@ checkSame("/update opens the admin update page",
   routeFor("/update"));
 checkSame("API endpoint", array("page_type" => "api", "active_page" => "term"), routeFor("/api/term/"));
 checkSame("other files in settings/ go to the home page", array("page_type" => "home"), routeFor("/settings/db.php"));
+checkSame("a term's own address, ignoring the query string",
+  array("page_type" => "term", "active_page" => "acoustic_allometry"), routeFor("/acoustic_allometry?lang=fr"));
+
+section("Content negotiation");
+function formatFor($accept, $get = array()) {
+  if ($accept === null) {
+    unset($_SERVER["HTTP_ACCEPT"]);
+  } else {
+    $_SERVER["HTTP_ACCEPT"] = $accept;
+  }
+  $_GET = $get;
+  return(requestedFormat());
+}
+checkSame("HTML when there is no Accept header", "html", formatFor(null));
+checkSame("HTML for a browser", "html", formatFor("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"));
+checkSame("JSON-LD when it is asked for", "jsonld", formatFor("application/ld+json"));
+checkSame("JSON-LD when it is preferred to HTML", "jsonld", formatFor("text/html;q=0.5, application/ld+json"));
+checkSame("HTML when it is preferred to JSON-LD", "html", formatFor("application/ld+json;q=0.9, text/html"));
+checkSame("HTML when both are equally acceptable", "html", formatFor("application/ld+json, text/html"));
+checkSame("HTML when JSON-LD is refused with q=0", "html", formatFor("application/ld+json;q=0"));
+checkSame("JSON-LD when it is preferred to anything else", "jsonld", formatFor("application/ld+json, */*;q=0.1"));
+checkSame("media types and parameters are case-insensitive", "jsonld", formatFor("Application/LD+JSON; Q=1.0"));
+checkSame("?format=jsonld asks for JSON-LD without an Accept header", "jsonld", formatFor(null, array("format" => "jsonld")));
+unset($_SERVER["HTTP_ACCEPT"]);
+$_GET = array();
+
+function linkedDataFor($pageInfo) {
+  $GLOBALS["ontomasticon"]["pageInfo"] = $pageInfo;
+  return(linkedDataURL());
+}
+checkSame("the home page links to the site's scheme", "/api/cv/", linkedDataFor(array("page_type" => "home")));
+checkSame("a vocabulary page links to the vocabulary's scheme", "/api/cv/?shortname=birds",
+  linkedDataFor(array("page_type" => "cv", "active_page" => "birds")));
+checkSame("the list of vocabularies has no JSON-LD", null, linkedDataFor(array("page_type" => "cv", "active_page" => "")));
+checkSame("a term's address links to the term", "/api/term/?term=https%3A%2F%2Fglossary.example.org%2Facoustic_allometry&format=jsonld",
+  linkedDataFor(array("page_type" => "term", "active_page" => "acoustic_allometry")));
+checkSame("other pages have no JSON-LD", null, linkedDataFor(array("page_type" => "admin", "active_page" => "config")));
+unset($GLOBALS["ontomasticon"]["pageInfo"]);
 
 section("Languages");
 $_GET = array("lang" => "jibberish");

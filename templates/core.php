@@ -14,6 +14,11 @@ if (file_exists("settings/user.css")) {
   <link rel="stylesheet" type="text/css" href="/settings/user.css" />
   <?php
 }
+if (linkedDataURL() !== null) {
+  ?>
+  <link rel="alternate" type="application/ld+json" href="<?php print h(linkedDataURL()); ?>" />
+  <?php
+}
 ?>
 </head>
 
@@ -45,6 +50,8 @@ switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
     template("cv.php");
     break;
   case "home":
+  case "term":
+    //A term's own address shows the list of terms it is in
     template("home.php");
     break;
   case "user":
