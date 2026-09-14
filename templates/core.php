@@ -1,4 +1,3 @@
-<?php session_start(); ?>
 <!DOCTYPE html>
 <html lang="<?php print h(t($GLOBALS["ontomasticon"]["config"]["default_lang"])); ?>">
 <head>
@@ -24,6 +23,10 @@ if (file_exists("settings/user.css")) {
 </div>
 
 <?php
+if ($GLOBALS["ontomasticon"]["csrf_failed"]) {
+  print "<div class='error'><p>".t("The form could not be verified. Please reload the page and try again.")."</p></div>";
+}
+
 if (userAllow("administer")) {
   $status = adminSanity();
   if ($status != NULL) {

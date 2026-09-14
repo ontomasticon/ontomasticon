@@ -1,14 +1,16 @@
 <h1><?php print t("User settings"); ?></h1>
 
 <?php
-  global $db;
+if (!isset($_SESSION["user"])) {
+  print t("You must be logged in to change your settings");
+} else {
   if(isset($_POST['submit'])){
     editUser();
   }
   $user = loadUSer($_SESSION["user"]);
   ?>
 
-  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post">
+  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post"><?php print csrfField(); ?>
     <label for="first_name"><?php print t("First name"); ?></label><br>
     <input type="text" name="first_name" value="<?php print h($user["first_name"]); ?>" placeholder=""><br>
 
@@ -29,3 +31,4 @@
     <button type="submit" name="submit"><?php print t("Save settings"); ?></button>
   </form>
   <?php
+}

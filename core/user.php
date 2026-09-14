@@ -24,8 +24,45 @@ function userAllow($task) {
   }
 }
 
-function login(){
+//CSRF token for this session, created on first use
+function csrfToken() {
+  if (!isset($_SESSION["csrf_token"])) {
+    $_SESSION["csrf_token"] = bin2hex(random_bytes(32));
+  }
+  return($_SESSION["csrf_token"]);
+}
+
+//Hidden form field carrying the CSRF token
+function csrfField() {
+  return("<input type='hidden' name='csrf_token' value='".h(csrfToken())."'>");
+}
+
+//Check that a submitted form carries this session's CSRF token
+function csrfValid() {
+  return(isset($_SESSION["csrf_token"]) && isset($_POST["csrf_token"]) && is_string($_POST["csrf_token"])
+    && hash_equals($_SESSION["csrf_token"], $_POST["csrf_token"]));
+}
+
+//Check a password against a user's database row, upgrading old or weak hashes
+function verifyPassword($password, $row) {
   global $db;
+  if (password_verify($password, $row["password"])) {
+    $rehash = password_needs_rehash($row["password"], PASSWORD_DEFAULT);
+  } elseif (password_verify($db->real_escape_string($password), $row["password"])) {
+    //Passwords set before prepared statements were introduced were hashed after SQL escaping
+    $rehash = TRUE;
+  } else {
+    return(FALSE);
+  }
+  if ($rehash) {
+    dbQuery("UPDATE `users` SET `password` = ? WHERE `id` = ?;", array(password_hash($password, PASSWORD_DEFAULT), $row["id"]));
+  }
+  return(TRUE);
+}
+
+//Log in from the login form. Must run before any output is sent.
+//Returns a message for the login page, or NULL on success.
+function login(){
   $email = trim($_POST['email']);
   $password = trim($_POST['password']);
 
@@ -33,21 +70,24 @@ function login(){
   $numRows = ($rs) ? mysqli_num_rows($rs) : 0;
   if($numRows  == 1){
     $row = mysqli_fetch_assoc($rs);
-    //Passwords set before prepared statements were introduced were hashed after SQL escaping
-    if(password_verify($password,$row['password']) || password_verify($db->real_escape_string($password),$row['password'])){
+    if(verifyPassword($password, $row)){
+      //A new session id on login prevents session fixation
+      session_regenerate_id(TRUE);
       $_SESSION["user"] = $email;
+      return(null);
     } else {
-      print t("Wrong password");
+      return("Wrong password");
     }
   } else {
-    print t("No matching user found");
+    return("No matching user found");
   }
 }
 
+//Log out. Must run before any output is sent.
 function logout(){
-  global $db;
   unset($_SESSION["user"]);
-  print "Logged out.";
+  session_regenerate_id(TRUE);
+  return("Logged out.");
 }
 
 function loadUser($email) {
@@ -66,8 +106,7 @@ function createUser(){
   $email     = $_POST['email'];
   $password  = $_POST['password'];
 
-  $options = array("cost"=>4);
-  $hashPassword = password_hash($password,PASSWORD_BCRYPT,$options);
+  $hashPassword = password_hash($password,PASSWORD_DEFAULT);
 
   $sql = "INSERT INTO `users` (first_name, last_name, email, password) VALUES (?, ?, ?, ?);";
   $result = dbQuery($sql, array($firstName, $surName, $email, $hashPassword));
@@ -88,6 +127,12 @@ function editUser() {
   if (!($o_password == "" && $n_password1 == "" && $n_password2 == "")) {
     if ($o_password == "") {
       $error .= "<p>Current password must be provided.</p>";
+    } else {
+      $rs = dbQuery("SELECT * FROM `users` WHERE `email` = ?;", array($_SESSION["user"]));
+      $row = ($rs) ? $rs->fetch_assoc() : null;
+      if ($row == null || !verifyPassword($o_password, $row)) {
+        $error .= "<p>Current password is incorrect.</p>";
+      }
     }
     if ($n_password1 == "" || $n_password2 == "") {
       $error .= "<p>You must repeat the new password.</p>";
@@ -103,11 +148,10 @@ function editUser() {
     $out .= "</div>";
     print $out;
   } else {
-    $options = array("cost"=>4);
     if ($n_password1 == "") {
       $hashPassword = null;
     } else {
-      $hashPassword = password_hash($n_password1,PASSWORD_BCRYPT,$options);
+      $hashPassword = password_hash($n_password1,PASSWORD_DEFAULT);
     }
 
     $sql  = "UPDATE `users` SET `first_name` = ?, `last_name` = ?";
@@ -119,6 +163,5 @@ function editUser() {
     $sql .= " WHERE `email` = ?;";
     $params[] = $_SESSION["user"];
     dbQuery($sql, $params);
-    $_SESSION["user"] = "email";
   }
 }

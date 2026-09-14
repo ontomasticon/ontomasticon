@@ -119,7 +119,8 @@ function adminSanity() {
   $numrows = mysqli_num_rows($rs);
   if ($numrows == 1) {
     $pw = mysqli_fetch_assoc($rs);
-    if ($pw["password"] == '$2y$04$oEaHJ.52kzQbFtQzC1zRdOuAkPc5J9il37vqMJofJvZMGqJtaMovW') {
+    //Hashes are upgraded on login, so check the password rather than the installed hash
+    if (password_verify("password", $pw["password"])) {
       $ret["Admin Password"] = "Admin password is still default value.";
     }
   }
