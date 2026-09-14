@@ -1,8 +1,10 @@
 <div id="sub-menu">
   <?php if (isset($_SESSION["user"])) {
-          print l("Settings", "/user/settings")." | ";
-          print l("Add user", "/user/register"); 
-        } else { 
+          print l("Settings", "/user/settings");
+          if (userAllow("create-user")) {
+            print " | ".l("Add user", "/user/register");
+          }
+        } else {
           print l("Login", "/user/login");
         } ?>
 </div>

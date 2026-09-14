@@ -1,7 +1,20 @@
 <div id="sub-menu">
-  <?php print l("Configure site", "/admin/configure"); ?> |
-  <?php print l("Add controlled vocabulary","/admin/cv/add"); ?> |
-  <?php print l("Add term", "/admin/term/add"); ?>
+  <?php
+  $links = array();
+  if (userAllow("administer")) {
+    $links[] = l("Configure site", "/admin/configure");
+  }
+  if (userAllow("manage-users")) {
+    $links[] = l("Users", "/admin/users");
+  }
+  if (userAllow("create-cv")) {
+    $links[] = l("Add controlled vocabulary","/admin/cv/add");
+  }
+  if (userAllow("edit-terms")) {
+    $links[] = l("Add term", "/admin/term/add");
+  }
+  print implode(" | ", $links);
+  ?>
 </div>
 
 <?php
@@ -25,6 +38,9 @@ switch ($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]) {
         template("admin-term-edit.php");
         break;
     }
+    break;
+  case "users":
+    template("admin-users.php");
     break;
   case "update":
     template("update.php");

@@ -1,18 +1,19 @@
 <h2><?php print t("Controlled vocabularies"); ?></h2>
 
 <?php
-if (!userAllow("administer")) {
+if (!userAllow("edit-cvs")) {
   print t("You do not have permission to administer this site");
 } else {
   $CV = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
   if(isset($_POST['submit'])){
     editCV();
   }
-  if (isset($_POST['delete'])){
+  //Deleting a CV also deletes its terms, so it has its own permission
+  if (isset($_POST['delete']) && userAllow("delete-cv")){
     template("admin-cv-delete.php");
     goto end;
   }
-  if (isset($_POST['delete_cv'])){
+  if (isset($_POST['delete_cv']) && userAllow("delete-cv")){
     deleteCV();
     print "<p>".t("Deleted.")."</p>";
     goto end;
@@ -33,7 +34,9 @@ if (!userAllow("administer")) {
            placeholder="">
            <br/><br/>
     <button type="submit" name="submit"><?php print t("Save"); ?></button>
+    <?php if (userAllow("delete-cv")) { ?>
     <button type="submit" name="delete"><?php print t("Delete"); ?></button>
+    <?php } ?>
   </form>
 <?php
 }

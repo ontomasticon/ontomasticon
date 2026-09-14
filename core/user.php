@@ -4,24 +4,59 @@
 //
 // Code for managing user accounts and permissions.
 
-//Check whether a user has permissions for an action.
+//Roles a user can have and the tasks each allows. "*" allows every task.
+function userRoles() {
+  return(array(
+    "administer" => array("name" => "Admin", "tasks" => array("*")),
+    "editor" => array("name" => "Editor", "tasks" => array("edit-terms", "edit-cvs")),
+    "create-cv" => array("name" => "Editor and CV creator", "tasks" => array("edit-terms", "edit-cvs", "create-cv"))
+  ));
+}
+
+//Display name of a role
+function roleName($role) {
+  $roles = userRoles();
+  return(isset($roles[$role]) ? $roles[$role]["name"] : "None");
+}
+
+//Dropdown for choosing a role
+function roleSelect($current = null) {
+  $out  = "<select name='role'>";
+  $out .= "<option value=''>".h(t("None"))."</option>";
+  foreach (userRoles() as $key => $role) {
+    $selected = ($key == $current) ? " selected" : "";
+    $out .= "<option value='".h($key)."'".$selected.">".h(t($role["name"]))."</option>";
+  }
+  $out .= "</select>";
+  return($out);
+}
+
+//Check whether the logged in user may perform a task.
 function userAllow($task) {
-  if (isset($_SESSION["user"])) {
-    $rs = dbQuery("SELECT * FROM `users` WHERE `email` = ?;", array($_SESSION["user"]));
-    $numrows = ($rs) ? mysqli_num_rows($rs) : 0;
-    if ($numrows == 1) {
-      $user = mysqli_fetch_assoc($rs);
-      if ($user["id"] == 1 || $user["role"] == "administer") {
-        return TRUE;
-      } else {
-        return FALSE;
-      }
-    } else {
-      return FALSE;
-    }
-  } else {
+  static $users = array();
+  if (!isset($_SESSION["user"])) {
     return FALSE;
   }
+  $email = $_SESSION["user"];
+  //Look each user up once per request, as this is called many times per page
+  if (!array_key_exists($email, $users)) {
+    $rs = dbQuery("SELECT `id`, `role` FROM `users` WHERE `email` = ?;", array($email));
+    $users[$email] = ($rs && mysqli_num_rows($rs) == 1) ? mysqli_fetch_assoc($rs) : null;
+  }
+  $user = $users[$email];
+  if ($user == null) {
+    return FALSE;
+  }
+  //User 1 is the installation's admin account and always has full access
+  if ($user["id"] == 1) {
+    return TRUE;
+  }
+  $roles = userRoles();
+  if (!isset($roles[$user["role"]])) {
+    return FALSE;
+  }
+  $tasks = $roles[$user["role"]]["tasks"];
+  return(in_array("*", $tasks) || in_array($task, $tasks));
 }
 
 //CSRF token for this session, created on first use
@@ -100,19 +135,42 @@ function loadUser($email) {
   return(null);
 }
 
+function getUsers() {
+  $result = dbQuery("SELECT `id`, `first_name`, `last_name`, `email`, `role` FROM `users` ORDER BY `id`;");
+  return(($result) ? $result->fetch_all(MYSQLI_ASSOC) : array());
+}
+
 function createUser(){
   $firstName = $_POST['first_name'];
   $surName   = $_POST['surname'];
   $email     = $_POST['email'];
   $password  = $_POST['password'];
+  $roles     = userRoles();
+  $role      = (isset($_POST['role']) && isset($roles[$_POST['role']])) ? $_POST['role'] : null;
 
   $hashPassword = password_hash($password,PASSWORD_DEFAULT);
 
-  $sql = "INSERT INTO `users` (first_name, last_name, email, password) VALUES (?, ?, ?, ?);";
-  $result = dbQuery($sql, array($firstName, $surName, $email, $hashPassword));
+  $sql = "INSERT INTO `users` (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?);";
+  $result = dbQuery($sql, array($firstName, $surName, $email, $hashPassword, $role));
   if($result) {
     print t("User created");
   }
+}
+
+//Change another user's role from the user list. Returns a message for the page.
+function setUserRole() {
+  $roles = userRoles();
+  $role = ($_POST['role'] == "") ? null : $_POST['role'];
+  if ($role != null && !isset($roles[$role])) {
+    return("Unknown role");
+  }
+  //Stops admins locking themselves out
+  $me = loadUser($_SESSION["user"]);
+  if ($me["id"] == $_POST['user_id']) {
+    return("You cannot change your own role");
+  }
+  dbQuery("UPDATE `users` SET `role` = ? WHERE `id` = ?;", array($role, $_POST['user_id']));
+  return("Role updated");
 }
 
 function editUser() {

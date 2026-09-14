@@ -1,7 +1,7 @@
 <h2><?php print t("Terms"); ?></h2>
 
 <?php
-if (!userAllow("administer")) {
+if (!userAllow("edit-terms")) {
   print t("You do not have permission to administer this site");
 } else {
   $sn = getTerm($GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"]);

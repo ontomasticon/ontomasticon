@@ -1,7 +1,7 @@
 <h2><?php print t("Controlled vocabularies"); ?></h2>
 
 <?php
-if (!userAllow("administer")) {
+if (!userAllow("create-cv")) {
   print t("You do not have permission to administer this site");
 } else {
   if(isset($_POST['submit'])){

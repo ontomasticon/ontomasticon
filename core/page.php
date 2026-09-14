@@ -88,6 +88,8 @@ function logInOut() {
 function adminLink() {
   if (userAllow("administer")) {
     return (l("Administration", "/admin/config"));
+  } elseif (userAllow("edit-terms")) {
+    return (l("Administration", "/admin/term/add"));
   }
 }
 
@@ -98,14 +100,14 @@ function userLink() {
 }
 
 function termEditLink($sn) {
-  if (userAllow("administer")) {
+  if (userAllow("edit-terms")) {
     $ret = "[".l("edit", "/admin/term/edit/".$sn)."]";
     return($ret);
   }
 }
 
 function cvEditLink($sn) {
-  if (userAllow("administer")) {
+  if (userAllow("edit-cvs")) {
     $ret = "[".l("edit", "/admin/cv/edit/".$sn)."]";
     return($ret);
   }

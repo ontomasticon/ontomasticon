@@ -14,6 +14,7 @@ if (!userAllow("create-user")) {
     <input type="text" name="surname" value="" placeholder="<?php print t("Surname"); ?>">
     <input type="text" name="email" value="" placeholder="<?php print t("Email"); ?>">
     <input type="password" name="password" value="" placeholder="<?php print t("Password"); ?>">
+    <?php print roleSelect(); ?>
     <button type="submit" name="submit"><?php print t("Create user"); ?></button>
   </form>
   <?php
