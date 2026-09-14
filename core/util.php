@@ -84,6 +84,14 @@ function siteURL() {
   return("https://".$base);
 }
 
+//Short names of terms and vocabularies are used as they are in URIs (the site address followed by
+//the name, cv/name, and cv/vocabulary#name), so they may only use letters A to Z, digits, hyphens,
+//underscores and full stops. A leading full stop is refused too: paths such as /. and /.. are
+//normalised away, and .htaccess forbids hidden files.
+function validShortname($shortname) {
+  return(preg_match('/^[A-Za-z0-9_-][A-Za-z0-9._-]*$/D', $shortname) === 1);
+}
+
 //Check whether an IP address is in a list of addresses and CIDR ranges (IPv4 or IPv6)
 function ipInRanges($ip, $ranges) {
   $address = @inet_pton($ip);

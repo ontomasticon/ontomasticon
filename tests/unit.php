@@ -66,6 +66,16 @@ checkSame("term in a vocabulary", "https://glossary.example.org/cv/birds#song",
 checkSame("opaque term uses its id", "https://glossary.example.org/cv/birds#7",
   term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 1)));
 
+section("Short names");
+check("letters, digits, hyphens, underscores and full stops are allowed", validShortname("Bird_song-2.1"));
+check("a space isn't allowed", !validShortname("odd term"));
+check("nor characters that mean something in URIs",
+  !validShortname("a/b") && !validShortname("a?b") && !validShortname("a#b") && !validShortname("a%20b"));
+check("nor letters outside A to Z", !validShortname("café"));
+check("nor a full stop at the start", !validShortname(".hidden") && !validShortname(".."));
+check("nor a trailing newline", !validShortname("sound\n"));
+check("nor an empty name", !validShortname(""));
+
 section("Routing");
 function routeFor($uri) {
   $_SERVER["REQUEST_URI"] = $uri;

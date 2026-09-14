@@ -170,6 +170,10 @@ function addTerm() {
     printError(t("Not saved. A short name is required."));
     return(FALSE);
   }
+  if (!validShortname($shortname)) {
+    printError(t("Not saved. A short name can only use the letters A to Z, digits, hyphens, underscores and full stops, and can't start with a full stop."));
+    return(FALSE);
+  }
   if (termID($shortname) !== null) {
     printError(t("Not saved. There is already a term with the short name")." ".$shortname);
     return(FALSE);

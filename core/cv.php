@@ -70,6 +70,10 @@ function addCV() {
     printError(t("Not saved. A short name is required."));
     return(FALSE);
   }
+  if (!validShortname($shortname)) {
+    printError(t("Not saved. A short name can only use the letters A to Z, digits, hyphens, underscores and full stops, and can't start with a full stop."));
+    return(FALSE);
+  }
   $existing = dbQuery("SELECT `shortname` FROM `cv` WHERE `shortname` = ?;", array($shortname));
   if ($existing && $existing->num_rows > 0) {
     printError(t("Not saved. There is already a controlled vocabulary with the short name")." ".$shortname);
