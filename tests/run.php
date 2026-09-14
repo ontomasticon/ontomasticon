@@ -3,6 +3,7 @@
 //
 // Unit tests always run. Database tests also run when these environment variables are set:
 //   TEST_DB_HOST, TEST_DB_USER, TEST_DB_PASSWORD, TEST_DB_NAME
+// HTTP tests also run when TEST_HTTP=1 is set and settings/db.php connects to that same database.
 // WARNING: the database tests drop every table in TEST_DB_NAME. Never point them at a real site.
 
 error_reporting(E_ALL);
@@ -78,6 +79,11 @@ require("tests/unit.php");
 
 if (getenv("TEST_DB_NAME")) {
   require("tests/database.php");
+  if (getenv("TEST_HTTP")) {
+    require("tests/http.php");
+  } else {
+    print "\nHTTP tests skipped: set TEST_HTTP=1, with settings/db.php connecting to the test database, to run them.\n";
+  }
 } else {
   print "\nDatabase tests skipped: set TEST_DB_HOST, TEST_DB_USER, TEST_DB_PASSWORD and TEST_DB_NAME to run them.\n";
 }
