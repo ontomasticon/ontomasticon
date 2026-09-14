@@ -15,7 +15,7 @@ if (isset($_GET["term"])) {
   }
   if ($name !== null) {
     $term = getTerm($name);
-    if ($term == null && ctype_digit($name)) {
+    if ($term == null && preg_match('/^[0-9]+$/D', $name) === 1) {
       $term = getTermByID($name);
       //Only opaque terms are identified by their id
       if ($term != null && $term["opaque"] != 1) {
