@@ -135,11 +135,16 @@ class Term {
   //The term's URI: the site address followed by its shortname, or its id if the term is opaque.
   //Terms in a vocabulary are fragments of the vocabulary's page.
   public function uri() {
-    $name = ($this->opaque == 0) ? $this->shortname : $this->id;
     if ($this->cv == null) {
-      return(siteURL().$name);
+      return(siteURL().$this->anchor());
     }
-    return($this->vocabulary()->uri()."#".$name);
+    return($this->vocabulary()->uri()."#".$this->anchor());
+  }
+
+  //The name that ends the term's URI, and the id of its entry on the page that lists it:
+  //its shortname, or its id if the term is opaque
+  public function anchor() {
+    return(($this->opaque == 0) ? $this->shortname : $this->id);
   }
 
   public function vocabulary() {
