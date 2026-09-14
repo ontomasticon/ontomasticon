@@ -8,7 +8,7 @@ if (!userAllow("administer")) {
     saveConfig();
   }
   ?>
-  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post"><?php print csrfField(); ?>
+  <form action="<?php print formAction(); ?>" method="post"><?php print csrfField(); ?>
     <label for="site_name"><?php print t("Site name"); ?></label><br/>
     <input type="text" id="site_name" name="site_name"
            value="<?php print h($GLOBALS["ontomasticon"]["config"]["site_name"]);?>"

@@ -9,7 +9,7 @@ if (!userAllow("create-cv")) {
   }
   ?>
   <h3><?php print t("Add controlled vocabulary"); ?></h3>
-  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post"><?php print csrfField(); ?>
+  <form action="<?php print formAction(); ?>" method="post"><?php print csrfField(); ?>
     <label for="shortname"><?php print t("Shortname"); ?></label><br/>
     <input type="text" id="shortname" name="shortname"
            placeholder="">

@@ -1,0 +1,45 @@
+name: Tests
+
+# Runs on every push to any branch (checking the newest commit pushed) and on pull requests
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest supported version, and a recent 8.x release
+        php: ['7.3', '8.4']
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: ontomasticon_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli
+          coverage: none
+
+      - name: Run tests
+        env:
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_USER: root
+          TEST_DB_PASSWORD: root
+          TEST_DB_NAME: ontomasticon_test
+        run: php tests/run.php

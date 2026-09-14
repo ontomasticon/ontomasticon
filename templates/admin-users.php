@@ -24,7 +24,7 @@ if (!userAllow("manage-users")) {
       } elseif ($user["id"] == $me["id"]) {
         print h(t(roleName($user["role"])));
       } else { ?>
-        <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post"><?php print csrfField(); ?>
+        <form action="<?php print formAction(); ?>" method="post"><?php print csrfField(); ?>
           <input type="hidden" name="user_id" value="<?php print h($user["id"]); ?>">
           <?php print roleSelect($user["role"]); ?>
           <button type="submit" name="set_role"><?php print t("Save"); ?></button>

@@ -9,6 +9,12 @@ function h($s) {
   return(htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'));
 }
 
+//Escaped address for a form that posts back to the current page. Uses the address
+//the visitor requested, as PHP_SELF is /index.php under most rewrite configurations.
+function formAction() {
+  return(h($_SERVER['REQUEST_URI']));
+}
+
 //Run a parameterised query. Returns a mysqli_result for queries that
 //return rows, TRUE for other successful queries and FALSE on failure.
 function dbQuery($sql, $params = array()) {

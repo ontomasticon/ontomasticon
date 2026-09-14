@@ -21,7 +21,7 @@ if (!userAllow("manage-users")) {
   }
   if (isset($_POST['delete']) && $canDelete) {
     ?>
-    <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post"><?php print csrfField(); ?>
+    <form action="<?php print formAction(); ?>" method="post"><?php print csrfField(); ?>
       <p><?php print t("Warning! This cannot be undone."); ?></p>
       <button type="submit" name="delete_user"><?php print t("Delete user"); ?></button>
     </form>
@@ -33,7 +33,7 @@ if (!userAllow("manage-users")) {
     $user = getUser($user["id"]);
   }
   ?>
-  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post"><?php print csrfField(); ?>
+  <form action="<?php print formAction(); ?>" method="post"><?php print csrfField(); ?>
     <label for="first_name"><?php print t("First name"); ?></label><br/>
     <input type="text" id="first_name" name="first_name" value="<?php print h($user["first_name"]); ?>"><br/><br/>
     <label for="last_name"><?php print t("Surname"); ?></label><br/>

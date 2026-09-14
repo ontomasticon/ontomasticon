@@ -25,7 +25,7 @@ if (!userAllow("edit-cvs")) {
   }
   ?>
   <h3><?php print t("Edit")." <i>".h($GLOBALS["ontomasticon"]["CVs"][$CV]["shortname"]); ?></i></h3>
-  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post"><?php print csrfField(); ?>
+  <form action="<?php print formAction(); ?>" method="post"><?php print csrfField(); ?>
     <label for="name"><?php print t("Name"); ?></label><br/>
     <input type="text" id="name" name="name"
            value="<?php print h($GLOBALS["ontomasticon"]["CVs"][$CV]["name"]); ?>"
