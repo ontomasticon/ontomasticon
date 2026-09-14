@@ -7,10 +7,8 @@
 //Check whether a user has permissions for an action.
 function userAllow($task) {
   if (isset($_SESSION["user"])) {
-    global $db;
-    $sql = "SELECT * FROM `users` WHERE `email` = '".$_SESSION["user"]."';";
-    $rs = $db->query($sql);
-    $numrows = mysqli_num_rows($rs);
+    $rs = dbQuery("SELECT * FROM `users` WHERE `email` = ?;", array($_SESSION["user"]));
+    $numrows = ($rs) ? mysqli_num_rows($rs) : 0;
     if ($numrows == 1) {
       $user = mysqli_fetch_assoc($rs);
       if ($user["id"] == 1 || $user["role"] == "administer") {
@@ -28,15 +26,15 @@ function userAllow($task) {
 
 function login(){
   global $db;
-  $email = $db->real_escape_string(trim($_POST['email']));
-  $password = $db->real_escape_string(trim($_POST['password']));
+  $email = trim($_POST['email']);
+  $password = trim($_POST['password']);
 
-  $sql = "SELECT * FROM `users` WHERE email = '".$email."'";
-  $rs = $db->query($sql);
-  $numRows = mysqli_num_rows($rs);
+  $rs = dbQuery("SELECT * FROM `users` WHERE email = ?;", array($email));
+  $numRows = ($rs) ? mysqli_num_rows($rs) : 0;
   if($numRows  == 1){
     $row = mysqli_fetch_assoc($rs);
-    if(password_verify($password,$row['password'])){
+    //Passwords set before prepared statements were introduced were hashed after SQL escaping
+    if(password_verify($password,$row['password']) || password_verify($db->real_escape_string($password),$row['password'])){
       $_SESSION["user"] = $email;
     } else {
       print t("Wrong password");
@@ -53,10 +51,7 @@ function logout(){
 }
 
 function loadUser($email) {
-  global $db;
-  $email = $db->real_escape_string($email);
-  $sql = "SELECT * FROM `users` WHERE `email` = '".$email."';";
-  $result = $db->query($sql);
+  $result = dbQuery("SELECT * FROM `users` WHERE `email` = ?;", array($email));
   if ($result) {
     $ret = $result->fetch_assoc();
     unset($ret["password"]);
@@ -66,18 +61,16 @@ function loadUser($email) {
 }
 
 function createUser(){
-  global $db;
-  $firstName = $db->real_escape_string($_POST['first_name']);
-  $surName   = $db->real_escape_string($_POST['surname']);
-  $email     = $db->real_escape_string($_POST['email']);
-  $password  = $db->real_escape_string($_POST['password']);
+  $firstName = $_POST['first_name'];
+  $surName   = $_POST['surname'];
+  $email     = $_POST['email'];
+  $password  = $_POST['password'];
 
   $options = array("cost"=>4);
   $hashPassword = password_hash($password,PASSWORD_BCRYPT,$options);
 
-  global $db;
-  $sql = "INSERT INTO `users` (first_name, last_name, email, password) value('".$firstName."', '".$surName."', '".$email."','".$hashPassword."')";
-  $result = $db->query($sql);
+  $sql = "INSERT INTO `users` (first_name, last_name, email, password) VALUES (?, ?, ?, ?);";
+  $result = dbQuery($sql, array($firstName, $surName, $email, $hashPassword));
   if($result) {
     print t("User created");
   }
@@ -85,13 +78,12 @@ function createUser(){
 
 function editUser() {
   $error = "";
-  global $db;
 
-  $first_name  = $db->real_escape_string($_POST['first_name']);
-  $last_name   = $db->real_escape_string($_POST['last_name']);
-  $o_password  = $db->real_escape_string($_POST['old_password']);
-  $n_password1 = $db->real_escape_string($_POST['new_password1']);
-  $n_password2 = $db->real_escape_string($_POST['new_password2']);
+  $first_name  = $_POST['first_name'];
+  $last_name   = $_POST['last_name'];
+  $o_password  = $_POST['old_password'];
+  $n_password1 = $_POST['new_password1'];
+  $n_password2 = $_POST['new_password2'];
 
   if (!($o_password == "" && $n_password1 == "" && $n_password2 == "")) {
     if ($o_password == "") {
@@ -118,12 +110,15 @@ function editUser() {
       $hashPassword = password_hash($n_password1,PASSWORD_BCRYPT,$options);
     }
 
-    $sql  = "UPDATE `users` SET ";
-    $sql .= "`first_name` = '".$first_name."', ";
-    $sql .= "`last_name` = '".$last_name."'";
-    $sql .= ($hashPassword == null) ? "" : ", `password` = '".$hashPassword."'";
-    $sql .= " WHERE `email` = '".$_SESSION["user"]."';";
-    $db->query($sql);
+    $sql  = "UPDATE `users` SET `first_name` = ?, `last_name` = ?";
+    $params = array($first_name, $last_name);
+    if ($hashPassword != null) {
+      $sql .= ", `password` = ?";
+      $params[] = $hashPassword;
+    }
+    $sql .= " WHERE `email` = ?;";
+    $params[] = $_SESSION["user"];
+    dbQuery($sql, $params);
     $_SESSION["user"] = "email";
   }
 }

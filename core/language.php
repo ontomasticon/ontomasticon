@@ -7,7 +7,8 @@
 function detectLanguage(){
   $lang = $GLOBALS["ontomasticon"]["config"]["default_lang"];
 
-  if (isset($_GET["lang"])) {
+  //Only accept plain language codes, as the value is used in file paths
+  if (isset($_GET["lang"]) && preg_match('/^[A-Za-z0-9_-]+$/', $_GET["lang"])) {
     $lang = $_GET["lang"];
   }
   return($lang);

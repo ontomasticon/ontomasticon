@@ -9,7 +9,7 @@ if (!userAllow("create-user")) {
     createUser();
   }
   ?>
-  <form action="<?php echo $_SERVER['PHP_SELF']?>" method="post">
+  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post">
     <input type="text" name="first_name" value="" placeholder="<?php print t("First name"); ?>">
     <input type="text" name="surname" value="" placeholder="<?php print t("Surname"); ?>">
     <input type="text" name="email" value="" placeholder="<?php print t("Email"); ?>">

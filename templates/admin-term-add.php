@@ -9,7 +9,7 @@ if (!userAllow("administer")) {
   }
   ?>
   <h3><?php print t("Add term"); ?></i></h3>
-  <form action="<?php echo $_SERVER['PHP_SELF']?>" method="post">
+  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post">
     <label for="shortname"><?php print t("Shortname"); ?></label><br/>
     <input type="text" id="shortname" name="shortname"
            placeholder="">
@@ -31,9 +31,9 @@ if (!userAllow("administer")) {
     <input type="radio" id="nocv" name="cv" value="none">
     <label for="nocv"><?php print t("None"); ?></label><br/>
     <?php foreach ($GLOBALS["ontomasticon"]["CVs"] as $CV) { ?>
-      <input type="radio" id="<?php print $CV["shortname"]; ?>" name="cv"
-        value="<?php print $CV["shortname"]; ?>">
-      <label for="<?php print $CV["shortname"]; ?>"><?php print $CV["name"]; ?></label><br/>
+      <input type="radio" id="<?php print h($CV["shortname"]); ?>" name="cv"
+        value="<?php print h($CV["shortname"]); ?>">
+      <label for="<?php print h($CV["shortname"]); ?>"><?php print h($CV["name"]); ?></label><br/>
     <?php }
     print "<br/"; ?>
     <label for="none"><?php print t("Invalidity"); ?></label><br/>

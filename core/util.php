@@ -4,16 +4,39 @@
 //
 // Miscellanous utility functions
 
+//Escape a value for output in HTML text or attributes
+function h($s) {
+  return(htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'));
+}
+
+//Run a parameterised query. Returns a mysqli_result for queries that
+//return rows, TRUE for other successful queries and FALSE on failure.
+function dbQuery($sql, $params = array()) {
+  global $db;
+  $stmt = $db->prepare($sql);
+  if (!$stmt) {
+    return(FALSE);
+  }
+  if (count($params) > 0) {
+    $stmt->bind_param(str_repeat("s", count($params)), ...$params);
+  }
+  if (!$stmt->execute()) {
+    return(FALSE);
+  }
+  $result = $stmt->get_result();
+  return(($result === FALSE) ? TRUE : $result);
+}
+
 //Hyperlinking function
 function l($text, $url) {
   if (substr($url, 0, 1) == '/') {
     if (isset($_GET["lang"])) {
-      $url .= "?lang=".$_GET["lang"];
+      $url .= "?lang=".urlencode(detectLanguage());
     }
   }
 
-  $ret  = "<a href='".$url."'>";
-  $ret .= t($text);
+  $ret  = "<a href='".h($url)."'>";
+  $ret .= h(t($text));
   $ret .= "</a>";
 
   return($ret);

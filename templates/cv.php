@@ -7,10 +7,10 @@ foreach ($GLOBALS["ontomasticon"]["CVs"] as $CV) {
 }
 
 if ($activeCV == null) {
-  print t("No matching controlled vocabulary found for")." ".$GLOBALS["ontomasticon"]["pageInfo"]["active_page"];
+  print t("No matching controlled vocabulary found for")." ".h($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]);
 } else {
   ?>
-  <h2><?php print t("Controlled Vocabulary").": ".$activeCV["name"]; ?></h2>
+  <h2><?php print t("Controlled Vocabulary").": ".h($activeCV["name"]); ?></h2>
   <div id="description"><?php print $activeCV["description"]; ?></div>
 <?php
 }

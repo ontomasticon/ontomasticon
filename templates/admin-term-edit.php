@@ -20,15 +20,15 @@ if (!userAllow("administer")) {
   }
   ?>
 
-  <h3><?php print t("Edit")." <i>".$sn["shortname"]; ?></i></h3>
-  <form action="<?php echo $_SERVER['PHP_SELF']?>" method="post">
+  <h3><?php print t("Edit")." <i>".h($sn["shortname"]); ?></i></h3>
+  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post">
     <label for="name"><?php print t("Name"); ?></label><br/>
     <input type="text" id="name" name="name"
-           value="<?php print $sn["name"]; ?>"
+           value="<?php print h($sn["name"]); ?>"
            placeholder="">
            <br/><br/>
     <label for="description"><?php print t("Description"); ?></label><br/>
-    <textarea id="description" name="description" rows="4" cols="50"><?php print $sn["description"];?></textarea><br/>
+    <textarea id="description" name="description" rows="4" cols="50"><?php print h($sn["description"]);?></textarea><br/>
     <label for="language"><?php print t("Language"); ?></label><br/>
     <input type="text" id="language" name="language"
            value="<?php print htmlspecialchars($sn["language"]); ?>"
@@ -41,9 +41,9 @@ if (!userAllow("administer")) {
     <input type="radio" id="nocv" name="cv" value="none" <?php print val2check($sn["cv"], ""); ?>>
     <label for="nocv"><?php print t("None"); ?></label><br/>
     <?php foreach ($GLOBALS["ontomasticon"]["CVs"] as $CV) { ?>
-      <input type="radio" id="<?php print $CV["shortname"]; ?>" name="cv"
-        value="<?php print $CV["shortname"]; ?>" <?php print val2check($sn["cv"], $CV["shortname"]); ?>>
-      <label for="<?php print $CV["shortname"]; ?>"><?php print $CV["name"]; ?></label><br/>
+      <input type="radio" id="<?php print h($CV["shortname"]); ?>" name="cv"
+        value="<?php print h($CV["shortname"]); ?>" <?php print val2check($sn["cv"], $CV["shortname"]); ?>>
+      <label for="<?php print h($CV["shortname"]); ?>"><?php print h($CV["name"]); ?></label><br/>
     <?php }
     print "<br/"; ?>
     <label for="none"><?php print t("Invalidity"); ?></label><br/>

@@ -54,9 +54,11 @@ foreach ($lines as $line) {
 
 <h2>Setting base_url</h2>
 <?php 
-print($_SERVER['SERVER_NAME']); 
-$sql = "INSERT INTO `config` VALUES('base_url', '".$_SERVER['SERVER_NAME']."/"."');";
-$db->query($sql);
+print(htmlspecialchars($_SERVER['SERVER_NAME'], ENT_QUOTES, 'UTF-8'));
+$base_url = $_SERVER['SERVER_NAME']."/";
+$stmt = $db->prepare("INSERT INTO `config` VALUES('base_url', ?);");
+$stmt->bind_param("s", $base_url);
+$stmt->execute();
 ?>
 
 <h2>Done!</h2>

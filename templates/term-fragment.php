@@ -1,11 +1,11 @@
-<div class="term <?php print $GLOBALS["ontomasticon"]["oddeven"]; ?>" id ="<?php print $GLOBALS["ontomasticon"]["term"]["shortname"]; ?>">
+<div class="term <?php print $GLOBALS["ontomasticon"]["oddeven"]; ?>" id ="<?php print h($GLOBALS["ontomasticon"]["term"]["shortname"]); ?>">
   <h3><?php
-    print $GLOBALS["ontomasticon"]["term"]["name"];
+    print h($GLOBALS["ontomasticon"]["term"]["name"]);
     print " ";
     print termEditLink($GLOBALS["ontomasticon"]["term"]["shortname"]);
   ?></h3>
   <p><?php print term2URI($GLOBALS["ontomasticon"]["term"], TRUE); ?></p>
-  <p><?php print $GLOBALS["ontomasticon"]["term"]["language"]; ?></p>
+  <p><?php print h($GLOBALS["ontomasticon"]["term"]["language"]); ?></p>
   <p><?php print $GLOBALS["ontomasticon"]["term"]["description"]; ?></p>
   <?php
   template("term-fragment-reference.php");
@@ -17,9 +17,9 @@
     <?php
     foreach ($GLOBALS["ontomasticon"]["term"]["children"] as $child) {
       print "<tr>";
-      print "<td class='invalid_reason'>".t($child["invalid_reason"])."</td>";
-      print "<td class='child_term_name'><a href='".term2URI($child)."'>".$child["name"]."</a></td>";
-      print "<td class='child_term_language'>".$child["language"]."</td>";
+      print "<td class='invalid_reason'>".h(t($child["invalid_reason"]))."</td>";
+      print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
+      print "<td class='child_term_language'>".h($child["language"])."</td>";
       print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";
       print "</tr>";
     }
@@ -37,9 +37,9 @@
     <?php
     foreach ($GLOBALS["ontomasticon"]["term"]["broader"] as $child) {
       print "<tr>";
-      print "<td class='invalid_reason'>".$child["invalid_reason"]."</td>";
-      print "<td class='child_term_name'><a href='".term2URI($child)."'>".$child["name"]."</a></td>";
-      print "<td class='child_term_language'>".$child["language"]."</td>";
+      print "<td class='invalid_reason'>".h($child["invalid_reason"])."</td>";
+      print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
+      print "<td class='child_term_language'>".h($child["language"])."</td>";
       print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";
       print "</tr>";
     }
@@ -57,9 +57,9 @@
     <?php
     foreach ($GLOBALS["ontomasticon"]["term"]["narrower"] as $child) {
       print "<tr>";
-      print "<td class='invalid_reason'>".$child["invalid_reason"]."</td>";
-      print "<td class='child_term_name'><a href='".term2URI($child)."'>".$child["name"]."</a></td>";
-      print "<td class='child_term_language'>".$child["language"]."</td>";
+      print "<td class='invalid_reason'>".h($child["invalid_reason"])."</td>";
+      print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
+      print "<td class='child_term_language'>".h($child["language"])."</td>";
       print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";
       print "</tr>";
     }

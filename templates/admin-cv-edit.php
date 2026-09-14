@@ -18,15 +18,15 @@ if (!userAllow("administer")) {
     goto end;
   }
   ?>
-  <h3><?php print t("Edit")." <i>".$GLOBALS["ontomasticon"]["CVs"][$CV]["shortname"]; ?></i></h3>
-  <form action="<?php echo $_SERVER['PHP_SELF']?>" method="post">
+  <h3><?php print t("Edit")." <i>".h($GLOBALS["ontomasticon"]["CVs"][$CV]["shortname"]); ?></i></h3>
+  <form action="<?php echo h($_SERVER['PHP_SELF']); ?>" method="post">
     <label for="name"><?php print t("Name"); ?></label><br/>
     <input type="text" id="name" name="name"
-           value="<?php print $GLOBALS["ontomasticon"]["CVs"][$CV]["name"]; ?>"
+           value="<?php print h($GLOBALS["ontomasticon"]["CVs"][$CV]["name"]); ?>"
            placeholder="">
            <br/><br/>
     <label for="description"><?php print t("Description"); ?></label><br/>
-    <textarea id="description" name="description" rows="4" cols="50"><?php print $GLOBALS["ontomasticon"]["CVs"][$CV]["description"];?></textarea><br/>
+    <textarea id="description" name="description" rows="4" cols="50"><?php print h($GLOBALS["ontomasticon"]["CVs"][$CV]["description"]);?></textarea><br/>
     <label for="reference"><?php print t("Reference"); ?></label><br/>
     <input type="text" id="reference" name="reference"
            value="<?php print htmlspecialchars($GLOBALS["ontomasticon"]["CVs"][$CV]["reference"]); ?>"
