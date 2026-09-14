@@ -164,6 +164,14 @@ check("with the terms that aren't in a vocabulary", in_array("https://glossary.e
   && !in_array("https://glossary.example.org/cv/calls#calling_song", array_column($graph, "@id")));
 list($status, , $body) = httpRequest("GET", "/api/cv/?shortname=missing");
 check("a missing vocabulary is not found", $status == 404 && $body == "null");
+$db->query("INSERT INTO `terms` (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('opaque_call', 'Opaque call', 'en', 1, 'calls');");
+$opaqueCall = getTerm("opaque_call");
+list(, , $body) = httpRequest("GET", "/cv/calls");
+check("the vocabulary page has an entry for each term, at the fragment of its URI",
+  strpos($body, 'id="calling_song"') !== FALSE && strpos(term2URI(getTerm("calling_song")), "#calling_song") !== FALSE);
+check("an opaque term's entry is at its id, as its URI is",
+  strpos($body, 'id="'.$opaqueCall["id"].'"') !== FALSE && strpos($body, 'id="opaque_call"') === FALSE
+  && term2URI($opaqueCall) === "https://glossary.example.org/cv/calls#".$opaqueCall["id"]);
 
 section("HTTP: content negotiation");
 $asJSONLD = array("Accept: application/ld+json");

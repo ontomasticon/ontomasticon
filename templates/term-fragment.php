@@ -1,4 +1,4 @@
-<div class="term <?php print $GLOBALS["ontomasticon"]["oddeven"]; ?>" id ="<?php print h($GLOBALS["ontomasticon"]["term"]["shortname"]); ?>">
+<div class="term <?php print $GLOBALS["ontomasticon"]["oddeven"]; ?>" id="<?php print h(termAnchor($GLOBALS["ontomasticon"]["term"])); ?>">
   <h3><?php
     print h($GLOBALS["ontomasticon"]["term"]["name"]);
     print " ";

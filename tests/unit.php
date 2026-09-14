@@ -65,6 +65,10 @@ checkSame("term in a vocabulary", "https://glossary.example.org/cv/birds#song",
   term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
 checkSame("opaque term uses its id", "https://glossary.example.org/cv/birds#7",
   term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 1)));
+checkSame("a term's entry on the page is named by its shortname", "song",
+  termAnchor(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
+checkSame("an opaque term's entry is named by its id, matching the fragment of its URI", "7",
+  termAnchor(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 1)));
 
 section("Short names");
 check("letters, digits, hyphens, underscores and full stops are allowed", validShortname("Bird_song-2.1"));

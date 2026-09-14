@@ -97,6 +97,11 @@ function term2URI($term, $link=FALSE) {
   return(($link) ? l($out, $out) : $out);
 }
 
+//The id of a term's entry on a page, which matches the fragment of its URI
+function termAnchor($term) {
+  return((string)Term::fromRow($term)->anchor());
+}
+
 //Look up the id of a term from its shortname, or NULL if there is no match
 function termID($shortname) {
   $result = dbQuery("SELECT `id` FROM `terms` WHERE `shortname` = ?;", array($shortname));
