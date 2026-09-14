@@ -66,7 +66,9 @@ function lang_jibberish() {
     "Not saved. A short name can only use the letters A to Z, digits, hyphens, underscores and full stops, and can't start with a full stop." => "Nothing scribbled. Jabber may only hold plain letters, digits, dashes, underscores and dots, and can't begin with a dot.",
     "Not saved. There is already a term with the short name" => "Nothing scribbled. This jabber is taken:",
     "Not saved. There is no term with the short name" => "Nothing scribbled. No such jabber:",
-    "Not saved. There is already a controlled vocabulary with the short name" => "Nothing scribbled. This weird word list exists already:"
+    "Not saved. There is already a controlled vocabulary with the short name" => "Nothing scribbled. This weird word list exists already:",
+    "Not saved. A short name made only of digits can only be used for an opaque term, as it could be mistaken for another term's id." => "Nothing scribbled. Jabber of nothing but numbers must wear a mask, or it will be taken for a counting rhyme.",
+    "Not saved. The site's own pages or files already use this address, so the short name can only be used for a term in a controlled vocabulary or an opaque term:" => "Nothing scribbled. The dragon already lives at this jabber, so only masked jabber or jabber in a weird word list may use it:"
   );
   return($ret);
 }
