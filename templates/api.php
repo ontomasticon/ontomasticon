@@ -6,4 +6,7 @@ switch($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]) {
     case "term":
         template("api-term.php");
         break;
+    case "cv":
+        template("api-cv.php");
+        break;
 };

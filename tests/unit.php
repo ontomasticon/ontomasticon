@@ -194,3 +194,36 @@ checkSame("and is a top concept of it", $ld["skos:inScheme"], $ld["skos:topConce
 checkSame("a term without a language has a plain label", "acoustic allometry", $ld["skos:prefLabel"]);
 check("an empty description gives no definition", !isset($ld["skos:definition"]) && !isset($ld["rdfs:comment"]));
 checkSame("gives a web address reference as a source", array("@id" => "https://doi.org/10.1000/example"), $ld["dcterms:source"]);
+
+section("JSON-LD vocabularies");
+$callType = new Vocabulary("callType");
+$callType->name = "Type of Call";
+$callType->description = "<p>Calls with the same function.</p>";
+$callType->reference = "Ragge and Reynolds 1998";
+$ld = vocabularyJSONLD($callType, array($premating, $song, $synonym, $response));
+$scheme = $ld["@graph"][0];
+checkSame("declares the prefixes once, for the whole graph", "http://www.w3.org/2004/02/skos/core#", $ld["@context"]["skos"]);
+checkSame("starts with the vocabulary as a concept scheme at its address",
+  array("https://glossary.example.org/cv/callType", "skos:ConceptScheme"), array($scheme["@id"], $scheme["@type"]));
+checkSame("titles the scheme in the site's language", array("@value" => "Type of Call", "@language" => "en"), $scheme["dcterms:title"]);
+check("and labels it with the same text", $scheme["rdfs:label"] === $scheme["dcterms:title"] && $scheme["skos:prefLabel"] === $scheme["dcterms:title"]);
+checkSame("describes the scheme in plain text", array("@value" => "Calls with the same function.", "@language" => "en"), $scheme["dcterms:description"]);
+checkSame("gives the vocabulary's reference", "Ragge and Reynolds 1998", $scheme["dcterms:bibliographicCitation"]);
+checkSame("follows it with every term, including deprecated ones", array(
+  "https://glossary.example.org/cv/callType#PrematingSong", "https://glossary.example.org/cv/callType#AgreementSong",
+  "https://glossary.example.org/cv/callType#AttractionSong", "https://glossary.example.org/cv/callType#ResponseCall"
+), array_column(array_slice($ld["@graph"], 1), "@id"));
+check("the terms don't repeat the prefixes", !isset($ld["@graph"][1]["@context"]));
+checkSame("lists the valid terms without a broader term as top concepts", array(
+  array("@id" => "https://glossary.example.org/cv/callType#PrematingSong"), array("@id" => "https://glossary.example.org/cv/callType#ResponseCall")
+), $scheme["skos:hasTopConcept"]);
+
+$GLOBALS["ontomasticon"]["config"]["site_name"] = "Bioacoustics Glossary";
+$GLOBALS["ontomasticon"]["config"]["description"] = "Terms used in <i>bioacoustics</i>.";
+$GLOBALS["ontomasticon"]["config"]["author"] = "Test Author";
+$scheme = vocabularyJSONLD(Vocabulary::site(), array())["@graph"][0];
+checkSame("the site's own scheme is at the site address", "https://glossary.example.org/", $scheme["@id"]);
+checkSame("and is titled with the site name", array("@value" => "Bioacoustics Glossary", "@language" => "en"), $scheme["dcterms:title"]);
+checkSame("and described with the site description", array("@value" => "Terms used in bioacoustics.", "@language" => "en"), $scheme["dcterms:description"]);
+checkSame("credits the site's author as its creator", "Test Author", $scheme["dcterms:creator"]);
+check("a scheme without terms has no top concepts", !isset($scheme["skos:hasTopConcept"]));

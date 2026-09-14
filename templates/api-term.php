@@ -32,7 +32,7 @@ if ($jsonld) {
     http_response_code(404);
     print("null");
   } else {
-    print(toJSON(termJSONLD(Term::findByID($term["id"])), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    print(jsonLDOutput(termJSONLD(Term::findByID($term["id"]))));
   }
   exit;
 }

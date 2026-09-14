@@ -24,4 +24,18 @@
         properties TDWG requires of controlled vocabulary terms.
     </p>
   </div>
+
+  <div class="feature">
+    <h3>Vocabulary endpoints</h3>
+    <p>These endpoints return JSON-LD.</p>
+
+    <h4>/api/cv/?shortname=</h4>
+    <p>
+        Given a controlled vocabulary's short name returns the vocabulary as a SKOS concept
+        scheme, followed by all of its terms as SKOS concepts.
+    </p>
+
+    <h4>/api/cv/</h4>
+    <p>Returns the terms that aren't in a controlled vocabulary, as the site's own concept scheme.</p>
+  </div>
 </div>

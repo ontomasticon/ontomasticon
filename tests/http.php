@@ -142,6 +142,29 @@ checkSame("finds an opaque term from its URL", "https://glossary.example.org/2",
 list($status, , $body) = httpRequest("GET", "/api/term/?shortname=missing&format=jsonld");
 check("a missing term is not found", $status == 404 && $body == "null");
 
+section("HTTP: vocabularies");
+$db->query("INSERT INTO `cv` (`shortname`, `name`, `description`, `reference`) VALUES ('calls', 'Calls', '<p>Types of call.</p>', '');");
+$db->query("INSERT INTO `terms` (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('calling_song', 'Calling song', 'en', 0, 'calls');");
+$db->query("INSERT INTO `terms` (`shortname`, `name`, `language`, `opaque`, `cv`, `broader`) SELECT 'rivalry_call', 'Rivalry call', 'en', 0, 'calls', `id` FROM `terms` WHERE `shortname` = 'calling_song';");
+list($status, $headers, $body) = httpRequest("GET", "/api/cv/?shortname=calls");
+$ld = json_decode($body, TRUE);
+$graph = (is_array($ld) && isset($ld["@graph"])) ? $ld["@graph"] : array(array("@id" => null, "@type" => null));
+check("returns a vocabulary as JSON-LD", $status == 200 && hasHeader($headers, '#^Content-Type: application/ld\+json#i'));
+checkSame("as a concept scheme at the vocabulary's address",
+  array("https://glossary.example.org/cv/calls", "skos:ConceptScheme"), array($graph[0]["@id"], $graph[0]["@type"]));
+checkSame("with its terms", array("https://glossary.example.org/cv/calls#calling_song", "https://glossary.example.org/cv/calls#rivalry_call"),
+  array_column(array_slice($graph, 1), "@id"));
+checkSame("and its top concepts", array(array("@id" => "https://glossary.example.org/cv/calls#calling_song")),
+  isset($graph[0]["skos:hasTopConcept"]) ? $graph[0]["skos:hasTopConcept"] : null);
+list($status, , $body) = httpRequest("GET", "/api/cv/");
+$ld = json_decode($body, TRUE);
+$graph = (is_array($ld) && isset($ld["@graph"])) ? $ld["@graph"] : array(array("@id" => null));
+checkSame("without a short name, returns the site's own scheme", "https://glossary.example.org/", $graph[0]["@id"]);
+check("with the terms that aren't in a vocabulary", in_array("https://glossary.example.org/acoustic_allometry", array_column($graph, "@id"))
+  && !in_array("https://glossary.example.org/cv/calls#calling_song", array_column($graph, "@id")));
+list($status, , $body) = httpRequest("GET", "/api/cv/?shortname=missing");
+check("a missing vocabulary is not found", $status == 404 && $body == "null");
+
 section("HTTP: logging in and forms");
 list(, , $body) = httpRequest("GET", "/user/login");
 preg_match("/name='csrf_token' value='([0-9a-f]{64})'/", $body, $matches);
