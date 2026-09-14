@@ -1,0 +1,39 @@
+# nginx configuration for Ontomasticon with PHP-FPM.
+# Change server_name, root and fastcgi_pass to suit your server, and add your HTTPS settings.
+
+server {
+    listen 80;
+    server_name glossary.example.org;
+    root /var/www/ontomasticon;
+    index index.php;
+
+    # Code, templates, language files and tests are only used through index.php
+    location ~ ^/(core|templates|lang|tests)/ {
+        return 403;
+    }
+
+    # The custom stylesheet is the only file in settings/ that browsers need
+    location = /settings/user.css {
+        try_files $uri =404;
+    }
+    location ^~ /settings/ {
+        return 403;
+    }
+
+    # Hidden files such as .git, except .well-known (used for HTTPS certificates)
+    location ~ /\.(?!well-known/) {
+        return 403;
+    }
+
+    # Serve files that exist (CSS, images) directly; send everything else to index.php
+    location / {
+        try_files $uri /index.php$is_args$args;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+    }
+}

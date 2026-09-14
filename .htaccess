@@ -1,0 +1,18 @@
+# Apache configuration for Ontomasticon.
+# Needs mod_rewrite, and AllowOverride All (or FileInfo) for this directory.
+# The same rules can go in the virtual host configuration instead.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Code, templates, language files and tests are only used through index.php
+  RewriteRule ^(core|templates|lang|tests)/ - [F]
+  # The custom stylesheet is the only file in settings/ that browsers need
+  RewriteRule ^settings/(?!user\.css$) - [F]
+  # Hidden files such as .git, except .well-known (used for HTTPS certificates)
+  RewriteRule (^|/)\.(?!well-known/) - [F]
+
+  # Serve files that exist (CSS, images, the installer) directly; send everything else to index.php
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [L]
+</IfModule>
