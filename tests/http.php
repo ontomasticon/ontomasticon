@@ -201,6 +201,34 @@ check("a browser's Accept header gets the vocabulary page", hasHeader($headers, 
 list(, , $body) = httpRequest("GET", "/ping", null, $asJSONLD);
 checkSame("other addresses aren't affected", "pong", $body);
 
+section("HTTP: Turtle");
+$asTurtle = array("Accept: text/turtle");
+list($status, $headers, $body) = httpRequest("GET", "/acoustic_allometry", null, $asTurtle);
+check("a term's address returns Turtle to a client that asks for it",
+  $status == 200 && hasHeader($headers, '#^Content-Type: text/turtle#i') && hasHeader($headers, '/^Vary: .*Accept/i'));
+check("describing the term", strpos($body, "<https://glossary.example.org/acoustic_allometry> a skos:Concept ;") !== FALSE);
+check("with the prefixes it uses", strpos($body, "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .") !== FALSE);
+list(, $headers, $body) = httpRequest("GET", "/cv/calls", null, array("Accept: text/turtle;q=0.9, application/ld+json;q=0.5"));
+check("a vocabulary's address returns Turtle when it is preferred to JSON-LD",
+  hasHeader($headers, '#^Content-Type: text/turtle#i') && strpos($body, "<https://glossary.example.org/cv/calls> a skos:ConceptScheme ;") !== FALSE);
+list(, $headers) = httpRequest("GET", "/cv/calls", null, array("Accept: text/turtle, application/ld+json"));
+check("and JSON-LD when both are equally acceptable", hasHeader($headers, '#^Content-Type: application/ld\+json#i'));
+list($status, $headers, $body) = httpRequest("GET", "/no_such_term", null, $asTurtle);
+check("an unknown term is not found, with an empty Turtle document",
+  $status == 404 && hasHeader($headers, '#^Content-Type: text/turtle#i') && $body === "");
+list($status, $headers, $body) = httpRequest("GET", "/api/term/?shortname=agreement_song&format=ttl");
+check("the term API returns Turtle with format=ttl", $status == 200 && hasHeader($headers, '#^Content-Type: text/turtle#i')
+  && strpos($body, 'rdfs:comment "The female’s response"@en') !== FALSE);
+list($status, , $body) = httpRequest("GET", "/api/term/?shortname=missing&format=ttl");
+check("a missing term is not found in Turtle", $status == 404 && $body === "");
+list($status, $headers, $body) = httpRequest("GET", "/api/cv/?format=ttl");
+check("the vocabulary API returns Turtle with format=ttl", $status == 200 && hasHeader($headers, '#^Content-Type: text/turtle#i')
+  && strpos($body, "<https://glossary.example.org/> a skos:ConceptScheme ;") !== FALSE);
+list(, $headers, $body) = httpRequest("GET", "/api/term/?shortname=acoustic_allometry");
+check("the term API still returns JSON by default", hasHeader($headers, '#^Content-Type: application/json#i') && is_array(json_decode($body, TRUE)));
+list(, , $body) = httpRequest("GET", "/");
+check("pages link to their Turtle too", strpos($body, '<link rel="alternate" type="text/turtle" href="/api/cv/?format=ttl"') !== FALSE);
+
 section("HTTP: logging in and forms");
 list(, , $body) = httpRequest("GET", "/user/login");
 preg_match("/name='csrf_token' value='([0-9a-f]{64})'/", $body, $matches);

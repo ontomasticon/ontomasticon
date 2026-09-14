@@ -70,17 +70,27 @@ function activePage() {
   return($ret);
 }
 
-//The format a request asks for: "jsonld" if it gives ?format=jsonld, or its Accept header
-//prefers JSON-LD to HTML, and otherwise "html". Browsers, and clients that accept both equally, get HTML.
+//The RDF format asked for with ?format=: "jsonld" for format=jsonld, "turtle" for format=ttl, otherwise NULL
+function formatParameter() {
+  $formats = array("jsonld" => "jsonld", "ttl" => "turtle");
+  if (isset($_GET["format"]) && is_string($_GET["format"]) && isset($formats[$_GET["format"]])) {
+    return($formats[$_GET["format"]]);
+  }
+  return(null);
+}
+
+//The format a request asks for: "jsonld" or "turtle" if it gives ?format=jsonld or ?format=ttl, or its
+//Accept header prefers JSON-LD or Turtle to HTML, and otherwise "html". Browsers, and clients that accept
+//HTML as much as RDF, get HTML. JSON-LD is chosen when it is as acceptable as Turtle.
 function requestedFormat() {
-  if (isset($_GET["format"]) && $_GET["format"] == "jsonld") {
-    return("jsonld");
+  if (formatParameter() !== null) {
+    return(formatParameter());
   }
   if (empty($_SERVER["HTTP_ACCEPT"])) {
     return("html");
   }
-  $formats = array("text/html" => "html", "application/xhtml+xml" => "html", "application/ld+json" => "jsonld");
-  $quality = array("html" => -1, "jsonld" => -1);
+  $formats = array("text/html" => "html", "application/xhtml+xml" => "html", "application/ld+json" => "jsonld", "text/turtle" => "turtle");
+  $quality = array("html" => -1, "jsonld" => -1, "turtle" => -1);
   foreach (explode(",", $_SERVER["HTTP_ACCEPT"]) as $range) {
     $parameters = explode(";", $range);
     $type = strtolower(trim($parameters[0]));
@@ -95,19 +105,31 @@ function requestedFormat() {
       $quality[$formats[$type]] = max($quality[$formats[$type]], $q);
     }
   }
-  return(($quality["jsonld"] > 0 && $quality["jsonld"] > $quality["html"]) ? "jsonld" : "html");
+  //An RDF format has to be more acceptable than the format chosen so far, starting with HTML
+  $best = "html";
+  foreach (array("jsonld", "turtle") as $format) {
+    if ($quality[$format] > 0 && $quality[$format] > $quality[$best]) {
+      $best = $format;
+    }
+  }
+  return($best);
 }
 
-//The address of the JSON-LD describing the current page, or NULL if there is none
-function linkedDataURL() {
+//The address of the RDF describing the current page, in JSON-LD or with $format "turtle" in Turtle,
+//or NULL if there is none
+function linkedDataURL($format = "jsonld") {
   $page = $GLOBALS["ontomasticon"]["pageInfo"];
+  $turtle = ($format == "turtle");
   switch ($page["page_type"]) {
     case "home":
-      return("/api/cv/");
+      return(($turtle) ? "/api/cv/?format=ttl" : "/api/cv/");
     case "cv":
-      return(($page["active_page"] == "") ? null : "/api/cv/?shortname=".rawurlencode($page["active_page"]));
+      if ($page["active_page"] == "") {
+        return(null);
+      }
+      return("/api/cv/?shortname=".rawurlencode($page["active_page"]).(($turtle) ? "&format=ttl" : ""));
     case "term":
-      return("/api/term/?term=".rawurlencode(siteURL().rawurldecode($page["active_page"]))."&format=jsonld");
+      return("/api/term/?term=".rawurlencode(siteURL().rawurldecode($page["active_page"]))."&format=".(($turtle) ? "ttl" : "jsonld"));
   }
   return(null);
 }

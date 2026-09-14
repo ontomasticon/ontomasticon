@@ -275,3 +275,54 @@ checkSame("and is titled with the site name", array("@value" => "Bioacoustics Gl
 checkSame("and described with the site description", array("@value" => "Terms used in bioacoustics.", "@language" => "en"), $scheme["dcterms:description"]);
 checkSame("credits the site's author as its creator", "Test Author", $scheme["dcterms:creator"]);
 check("a scheme without terms has no top concepts", !isset($scheme["skos:hasTopConcept"]));
+checkSame("a language that isn't a valid language tag is left out", "Calling Song", jsonLDText("Calling Song", "en_GB"));
+checkSame("a language tag with a region is kept", array("@value" => "Canto", "@language" => "pt-BR"), jsonLDText("Canto", "pt-BR"));
+
+section("Turtle");
+checkSame("Turtle when it is asked for", "turtle", formatFor("text/turtle"));
+checkSame("Turtle when it is preferred to JSON-LD", "turtle", formatFor("application/ld+json;q=0.5, text/turtle"));
+checkSame("JSON-LD when it is as acceptable as Turtle", "jsonld", formatFor("text/turtle, application/ld+json"));
+checkSame("HTML when it is as acceptable as Turtle", "html", formatFor("text/turtle, text/html"));
+checkSame("?format=ttl asks for Turtle", "turtle", formatFor(null, array("format" => "ttl")));
+checkSame("an unknown ?format is ignored", "html", formatFor(null, array("format" => "xml")));
+unset($_SERVER["HTTP_ACCEPT"]);
+$_GET = array();
+
+$GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "home");
+checkSame("the home page links to the site's scheme in Turtle", "/api/cv/?format=ttl", linkedDataURL("turtle"));
+$GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "cv", "active_page" => "birds");
+checkSame("a vocabulary page links to its scheme in Turtle", "/api/cv/?shortname=birds&format=ttl", linkedDataURL("turtle"));
+$GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "term", "active_page" => "acoustic_allometry");
+checkSame("a term's address links to the term in Turtle",
+  "/api/term/?term=https%3A%2F%2Fglossary.example.org%2Facoustic_allometry&format=ttl", linkedDataURL("turtle"));
+unset($GLOBALS["ontomasticon"]["pageInfo"]);
+
+checkSame("validUTF8() replaces invalid bytes", "female\xEF\xBF\xBDs", validUTF8("female\x92s"));
+checkSame("and leaves valid text, including HTML, alone", "a &amp; <b>’", validUTF8("a &amp; <b>’"));
+
+$expected = implode("\n", array(
+  '@prefix skos: <http://www.w3.org/2004/02/skos/core#> .',
+  '@prefix owl: <http://www.w3.org/2002/07/owl#> .',
+  '',
+  '<https://glossary.example.org/a> a skos:Concept ;',
+  '    skos:prefLabel "A \"quoted\"\nlabel\\\\"@en ;',
+  '    skos:altLabel "plain", "B"@en-GB ;',
+  //A space in an IRI is written as a backslash, u and its code point, 0020
+  '    skos:broader <https://glossary.example.org/b' . "\\" . 'u0020c> ;',
+  '    owl:deprecated true .',
+  ''
+));
+checkSame("writes the prefixes, then each subject with its properties, escaping strings and IRIs", $expected, turtleOutput(array(
+  "@context" => array("skos" => "http://www.w3.org/2004/02/skos/core#", "owl" => "http://www.w3.org/2002/07/owl#"),
+  "@id" => "https://glossary.example.org/a",
+  "@type" => "skos:Concept",
+  "skos:prefLabel" => array("@value" => "A \"quoted\"\nlabel\\", "@language" => "en"),
+  "skos:altLabel" => array("plain", array("@value" => "B", "@language" => "en-GB")),
+  "skos:broader" => array("@id" => "https://glossary.example.org/b c"),
+  "owl:deprecated" => TRUE
+)));
+checkSame("replaces invalid UTF-8 in strings", '"female' . "\xEF\xBF\xBD" . 's"', turtleString("female\x92s"));
+$turtle = turtleOutput(vocabularyJSONLD($callType, array($premating, $song, $synonym, $response)));
+checkSame("writes a vocabulary as its scheme followed by each of its terms", 5, preg_match_all('/^</m', $turtle));
+check("starting with the scheme", strpos($turtle, "\n<https://glossary.example.org/cv/callType> a skos:ConceptScheme ;\n") !== FALSE);
+check("with the same values as the JSON-LD", strpos($turtle, '    skos:definition "The female’s response."@en ;') !== FALSE);
