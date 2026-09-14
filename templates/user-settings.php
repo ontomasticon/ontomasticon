@@ -7,6 +7,9 @@ if (!isset($_SESSION["user"])) {
   if(isset($_POST['submit'])){
     editUser();
   }
+  if (!empty($_SESSION["must_change_password"])) {
+    printError(t("You are using the default password. Change it before continuing."));
+  }
   $user = loadUSer($_SESSION["user"]);
   ?>
 

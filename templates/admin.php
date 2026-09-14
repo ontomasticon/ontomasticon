@@ -42,6 +42,8 @@ switch ($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]) {
   case "users":
     if ($GLOBALS["ontomasticon"]["pageInfo"]["active_subpage"] == "add") {
       template("admin-user-add.php");
+    } elseif ($GLOBALS["ontomasticon"]["pageInfo"]["active_subpage"] == "edit") {
+      template("admin-user-edit.php");
     } else {
       template("admin-users.php");
     }

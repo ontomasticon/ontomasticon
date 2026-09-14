@@ -9,6 +9,9 @@ define("LOGIN_WINDOW", 900);
 define("LOGIN_MAX_PER_EMAIL", 5);
 define("LOGIN_MAX_PER_IP", 20);
 
+//Password the installer gives the admin account
+define("DEFAULT_PASSWORD", "password");
+
 //Roles a user can have and the tasks each allows. "*" allows every task.
 function userRoles() {
   return(array(
@@ -126,27 +129,31 @@ function login(){
   }
 
   $rs = dbQuery("SELECT * FROM `users` WHERE email = ?;", array($email));
-  $numRows = ($rs) ? mysqli_num_rows($rs) : 0;
-  if ($numRows == 1) {
-    $row = mysqli_fetch_assoc($rs);
-    if (verifyPassword($password, $row)) {
-      dbQuery("DELETE FROM `login_attempts` WHERE `email` = ?;", array($email));
-      //A new session id on login prevents session fixation
-      session_regenerate_id(TRUE);
-      $_SESSION["user"] = $email;
-      return(null);
+  $row = ($rs && mysqli_num_rows($rs) == 1) ? mysqli_fetch_assoc($rs) : null;
+  if ($row != null && verifyPassword($password, $row)) {
+    dbQuery("DELETE FROM `login_attempts` WHERE `email` = ?;", array($email));
+    //A new session id on login prevents session fixation
+    session_regenerate_id(TRUE);
+    $_SESSION["user"] = $email;
+    //Accounts still using the installer's password must change it before doing anything else
+    if ($password === DEFAULT_PASSWORD) {
+      $_SESSION["must_change_password"] = TRUE;
     }
-    $message = "Wrong password";
-  } else {
-    $message = "No matching user found";
+    return(null);
+  }
+  if ($row == null) {
+    //Take as long as checking a password, so response times don't reveal which emails have accounts
+    password_hash($password, PASSWORD_DEFAULT);
   }
   dbQuery("INSERT INTO `login_attempts` (`email`, `ip`, `attempted`) VALUES (?, ?, ?);", array($email, $ip, time()));
-  return($message);
+  //The same message either way, so it doesn't reveal which emails have accounts
+  return("Incorrect email address or password");
 }
 
 //Log out. Must run before any output is sent.
 function logout(){
   unset($_SESSION["user"]);
+  unset($_SESSION["must_change_password"]);
   session_regenerate_id(TRUE);
   return("Logged out.");
 }
@@ -159,6 +166,11 @@ function loadUser($email) {
     return($ret);
   }
   return(null);
+}
+
+function getUser($id) {
+  $result = dbQuery("SELECT `id`, `first_name`, `last_name`, `email`, `role` FROM `users` WHERE `id` = ?;", array($id));
+  return(($result) ? $result->fetch_assoc() : null);
 }
 
 function getUsers() {
@@ -175,21 +187,59 @@ function createUser(){
   $roles     = userRoles();
   $role      = (isset($_POST['role']) && isset($roles[$_POST['role']])) ? $_POST['role'] : null;
 
+  if ($email == "" || $password == "") {
+    printError(t("An email address and password are required"));
+    return;
+  }
   //Login needs each email address to belong to exactly one user
   if (loadUser($email) != null) {
-    print t("A user with that email address already exists");
+    printError(t("A user with that email address already exists"));
     return;
   }
 
   $hashPassword = password_hash($password,PASSWORD_DEFAULT);
 
   $sql = "INSERT INTO `users` (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?);";
-  $result = dbQuery($sql, array($firstName, $surName, $email, $hashPassword, $role));
-  if($result) {
-    print t("User created");
-  } else {
-    print t("The user could not be created");
+  reportSaved(dbQuery($sql, array($firstName, $surName, $email, $hashPassword, $role)), "User created");
+}
+
+//Change a user's name and email address from the admin user page
+function updateUserDetails($user) {
+  $first_name = trim($_POST['first_name']);
+  $last_name  = trim($_POST['last_name']);
+  $email      = trim($_POST['email']);
+
+  if ($email == "") {
+    printError(t("An email address is required"));
+    return(FALSE);
   }
+  $existing = loadUser($email);
+  if ($existing != null && $existing["id"] != $user["id"]) {
+    printError(t("A user with that email address already exists"));
+    return(FALSE);
+  }
+
+  $sql = "UPDATE `users` SET `first_name` = ?, `last_name` = ?, `email` = ? WHERE `id` = ?;";
+  $ok = reportSaved(dbQuery($sql, array($first_name, $last_name, $email, $user["id"])));
+  //Keep an admin who changes their own email address logged in
+  if ($ok && isset($_SESSION["user"]) && $_SESSION["user"] == $user["email"]) {
+    $_SESSION["user"] = $email;
+  }
+  return($ok);
+}
+
+//Delete a user. User 1 and the logged in user can't be deleted.
+function deleteUser($id) {
+  $me = loadUser($_SESSION["user"]);
+  if ($id == 1 || $id == $me["id"]) {
+    printError(t("This user cannot be deleted"));
+    return(FALSE);
+  }
+  $ok = dbQuery("DELETE FROM `users` WHERE `id` = ?;", array($id));
+  if (!$ok) {
+    printError(t("Could not delete").": ".dbError());
+  }
+  return((bool)$ok);
 }
 
 //Change another user's role from the user list. Returns a message for the page.
@@ -204,7 +254,9 @@ function setUserRole() {
   if ($me["id"] == $_POST['user_id']) {
     return("You cannot change your own role");
   }
-  dbQuery("UPDATE `users` SET `role` = ? WHERE `id` = ?;", array($role, $_POST['user_id']));
+  if (!dbQuery("UPDATE `users` SET `role` = ? WHERE `id` = ?;", array($role, $_POST['user_id']))) {
+    return("Could not update role");
+  }
   return("Role updated");
 }
 
@@ -234,6 +286,9 @@ function editUser() {
     if (!($n_password1 == $n_password2)) {
       $error .= "<p>New password and repeat password must match.</p>";
     }
+    if ($n_password1 === DEFAULT_PASSWORD) {
+      $error .= "<p>Choose a password other than the default.</p>";
+    }
   }
 
   if ($error != "") {
@@ -256,6 +311,8 @@ function editUser() {
     }
     $sql .= " WHERE `email` = ?;";
     $params[] = $_SESSION["user"];
-    dbQuery($sql, $params);
+    if (reportSaved(dbQuery($sql, $params)) && $hashPassword != null) {
+      unset($_SESSION["must_change_password"]);
+    }
   }
 }

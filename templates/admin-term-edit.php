@@ -5,6 +5,10 @@ if (!userAllow("edit-terms")) {
   print t("You do not have permission to administer this site");
 } else {
   $sn = getTerm($GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"]);
+  if ($sn == null) {
+    print t("No matching term found");
+    goto end;
+  }
   if(isset($_POST['submit'])){
     editTerm();
     $sn = getTerm($GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"]);
@@ -14,8 +18,9 @@ if (!userAllow("edit-terms")) {
     goto end;
   }
   if (isset($_POST['delete_term'])){
-    deleteTerm();
-    print "<p>".t("Deleted.")."</p>";
+    if (deleteTerm()) {
+      printStatus(t("Deleted."));
+    }
     goto end;
   }
   ?>

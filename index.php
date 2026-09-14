@@ -52,6 +52,18 @@ if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "user" && $GLOBALS["ont
   }
 }
 
+// Accounts still using the default password may only change it or log out
+if (isset($_SESSION["user"]) && !empty($_SESSION["must_change_password"])) {
+  $page = $GLOBALS["ontomasticon"]["pageInfo"];
+  $allowed = in_array($page["page_type"], array("api", "ping"))
+    || ($page["page_type"] == "user" && $page["active_page"] == "settings")
+    || ($page["page_type"] == "user" && $page["active_page"] == "login" && !isset($_POST['submit']));
+  if (!$allowed) {
+    header("Location: /user/settings");
+    exit;
+  }
+}
+
 // Load configuration
 $GLOBALS["ontomasticon"]["config"] = getConfig($db);
 $GLOBALS["ontomasticon"]["language"] = detectLanguage();

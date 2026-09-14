@@ -5,6 +5,10 @@ if (!userAllow("edit-cvs")) {
   print t("You do not have permission to administer this site");
 } else {
   $CV = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
+  if (!isset($GLOBALS["ontomasticon"]["CVs"][$CV])) {
+    print t("No matching controlled vocabulary found for")." ".h($CV);
+    goto end;
+  }
   if(isset($_POST['submit'])){
     editCV();
   }
@@ -14,8 +18,9 @@ if (!userAllow("edit-cvs")) {
     goto end;
   }
   if (isset($_POST['delete_cv']) && userAllow("delete-cv")){
-    deleteCV();
-    print "<p>".t("Deleted.")."</p>";
+    if (deleteCV()) {
+      printStatus(t("Deleted."));
+    }
     goto end;
   }
   ?>

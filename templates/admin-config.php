@@ -23,6 +23,7 @@ if (!userAllow("administer")) {
            value="<?php print h($GLOBALS["ontomasticon"]["config"]["default_lang"]);?>"
            placeholder=""><br/><br/>
     <label for="base_url"><?php print t("Base URL"); ?></label><br/>
+    <small><?php print t("For example glossary.example.org/ or http://glossary.example.org/ (https:// is assumed if left out)"); ?></small><br/>
     <input type="text" id="base_url" name="base_url"
            value="<?php print h($GLOBALS["ontomasticon"]["config"]["base_url"]);?>"
            placeholder=""><br/><br/>

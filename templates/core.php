@@ -15,6 +15,7 @@ if (file_exists("settings/user.css")) {
   <?php
 }
 ?>
+</head>
 
 <body>
 <div id="header">
@@ -73,6 +74,7 @@ switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
 <?php print adminLink(); ?><br/>
 <?php print userLink(); ?><br/>
 <?php print logInOut(); ?>
+</div>
 </body>
 
 </html>

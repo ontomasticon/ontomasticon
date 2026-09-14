@@ -13,7 +13,7 @@ if (!userAllow("manage-users")) {
   <p><?php print l("Add user", "/admin/users/add"); ?></p>
   <?php } ?>
   <table>
-    <tr><th><?php print t("Name"); ?></th><th><?php print t("Email"); ?></th><th><?php print t("Role"); ?></th></tr>
+    <tr><th><?php print t("Name"); ?></th><th><?php print t("Email"); ?></th><th><?php print t("Role"); ?></th><th></th></tr>
     <?php foreach (getUsers() as $user) { ?>
     <tr>
       <td><?php print h($user["first_name"]." ".$user["last_name"]); ?></td>
@@ -31,6 +31,7 @@ if (!userAllow("manage-users")) {
         </form>
       <?php } ?>
       </td>
+      <td>[<?php print l("edit", "/admin/users/edit/".$user["id"]); ?>]</td>
     </tr>
     <?php } ?>
   </table>
