@@ -126,6 +126,19 @@ $ld = termJSONLD($sound);
 checkSame("JSON-LD links the narrower terms", array(array("@id" => "https://glossary.example.org/animal_sound")), $ld["skos:narrower"]);
 checkSame("and the child terms as related", array(array("@id" => "https://glossary.example.org/bird_song")), $ld["skos:related"]);
 
+section("Vocabulary objects");
+checkSame("Vocabulary::find() gives NULL for a missing vocabulary", null, Vocabulary::find("missing"));
+$siteTerms = array();
+foreach (Vocabulary::site()->terms() as $term) {
+  $siteTerms[$term->shortname] = $term;
+}
+checkSame("the site's own scheme has the terms that aren't in a vocabulary", array("animal_sound", "bird_song", "sound"), array_keys($siteTerms));
+checkSame("loads their broader terms together", "sound", $siteTerms["animal_sound"]->broader()->shortname);
+checkSame("their narrower terms", array("animal_sound"), $shortnames($siteTerms["sound"]->narrower()));
+checkSame("their child terms", array("bird_song"), $shortnames($siteTerms["sound"]->children()));
+checkSame("and their parent terms", "sound", $siteTerms["bird_song"]->parent()->shortname);
+checkSame("a term without a broader term has none", null, $siteTerms["sound"]->broader());
+
 section("Editing terms");
 $GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "admin", "active_page" => "term", "active_subpage" => "edit", "active_subsubpage" => "bird_song");
 termForm(array("name" => "Birdsong", "parent" => "sound", "reference" => "Jones 2021"));
@@ -153,6 +166,13 @@ capture(function() { return(addTerm()); });
 termForm(array("shortname" => "wren_song", "name" => "Wren song", "parent" => "robin"));
 capture(function() { return(addTerm()); });
 checkSame("lists the vocabulary's terms", array("robin"), array_column(getTerms("birds"), "shortname"));
+$birds = Vocabulary::find("birds");
+checkSame("Vocabulary::find() loads a vocabulary", "Birds", ($birds != null) ? $birds->name : null);
+$birdTerms = ($birds != null) ? $birds->terms() : array();
+checkSame("with its terms", array("robin"), $shortnames($birdTerms));
+checkSame("and their child terms, even outside the vocabulary", array("wren_song"), (count($birdTerms) > 0) ? $shortnames($birdTerms[0]->children()) : null);
+checkSame("its JSON-LD scheme is at the vocabulary's address", "https://glossary.example.org/cv/birds",
+  ($birds != null) ? vocabularyJSONLD($birds, $birdTerms)["@graph"][0]["@id"] : null);
 $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "birds";
 list($out, $ok) = capture(function() { return(deleteCV()); });
 check("deletes the vocabulary and its terms", $ok && !array_key_exists("birds", getCVs()) && termRow("robin") == null);
