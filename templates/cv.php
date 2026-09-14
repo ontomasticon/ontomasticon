@@ -1,4 +1,14 @@
 <?php
+if ($GLOBALS["ontomasticon"]["pageInfo"]["active_page"] == "") {
+  //cv/ without a vocabulary name lists the vocabularies
+  if (count($GLOBALS["ontomasticon"]["CVs"]) > 0) {
+    printCVs($GLOBALS["ontomasticon"]["CVs"]);
+  } else {
+    print t("There are no controlled vocabularies yet");
+  }
+  return;
+}
+
 $activeCV = null;
 foreach ($GLOBALS["ontomasticon"]["CVs"] as $CV) {
   if ($CV["shortname"] == $GLOBALS["ontomasticon"]["pageInfo"]["active_page"]) {

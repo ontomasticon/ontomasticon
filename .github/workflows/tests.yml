@@ -36,10 +36,18 @@ jobs:
           extensions: mysqli
           coverage: none
 
+      - name: Point the site at the test database, for the HTTP tests
+        run: |
+          cat > settings/db.php <<'EOF'
+          <?php
+          $db = new mysqli(getenv("TEST_DB_HOST"), getenv("TEST_DB_USER"), getenv("TEST_DB_PASSWORD"), getenv("TEST_DB_NAME"));
+          EOF
+
       - name: Run tests
         env:
           TEST_DB_HOST: 127.0.0.1
           TEST_DB_USER: root
           TEST_DB_PASSWORD: root
           TEST_DB_NAME: ontomasticon_test
+          TEST_HTTP: "1"
         run: php tests/run.php
