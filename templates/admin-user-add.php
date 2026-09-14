@@ -1,10 +1,9 @@
-<h1><?php print t("Create user"); ?></h1>
+<h2><?php print t("Create user"); ?></h2>
 
 <?php
 if (!userAllow("create-user")) {
   print t("You do not have permission to create users");
 } else {
-  global $db;
   if(isset($_POST['submit'])){
     createUser();
   }

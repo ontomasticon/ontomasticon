@@ -9,6 +9,9 @@ if (!userAllow("manage-users")) {
   }
   $me = loadUser($_SESSION["user"]);
   ?>
+  <?php if (userAllow("create-user")) { ?>
+  <p><?php print l("Add user", "/admin/users/add"); ?></p>
+  <?php } ?>
   <table>
     <tr><th><?php print t("Name"); ?></th><th><?php print t("Email"); ?></th><th><?php print t("Role"); ?></th></tr>
     <?php foreach (getUsers() as $user) { ?>
