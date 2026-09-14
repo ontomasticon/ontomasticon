@@ -38,4 +38,15 @@
     <h4>/api/cv/</h4>
     <p>Returns the terms that aren't in a controlled vocabulary, as the site's own concept scheme.</p>
   </div>
+
+  <div class="feature">
+    <h3>Linked data</h3>
+    <p>
+        The site's own addresses return the same JSON-LD to clients that ask for it with the header
+        <code>Accept: application/ld+json</code>, or with <code>?format=jsonld</code>: the site's address
+        returns the site's concept scheme, <code>/cv/</code> followed by a short name returns that
+        vocabulary's scheme, and the address of a term that isn't in a vocabulary returns the term.
+        Other clients, including browsers, get the HTML page.
+    </p>
+  </div>
 </div>

@@ -74,6 +74,16 @@ $GLOBALS["ontomasticon"]["language"] = detectLanguage();
 $GLOBALS["ontomasticon"]["cv_count"] = CVcount($db);
 $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
 
+// The site's own addresses also identify its vocabularies and terms. Clients that ask for
+// JSON-LD (see requestedFormat()) get that there instead of the HTML page.
+if (in_array($GLOBALS["ontomasticon"]["pageInfo"]["page_type"], array("home", "cv", "term"))) {
+  header("Vary: Accept");
+  if (requestedFormat() == "jsonld") {
+    template("linked-data.php");
+    exit;
+  }
+}
+
 // Load correct page template
 switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
   case "api":

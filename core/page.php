@@ -59,9 +59,57 @@ function activePage() {
       $ret["page_type"] = "home";
       break;
     default:
-      $ret["page_type"] = "home";
+      if ($parts[1] == "") {
+        $ret["page_type"] = "home";
+      } else {
+        //A term outside a vocabulary, whose URI is the site address followed by its shortname (or id)
+        $ret["page_type"] = "term";
+        $ret["active_page"] = $parts[1];
+      }
   }
   return($ret);
+}
+
+//The format a request asks for: "jsonld" if it gives ?format=jsonld, or its Accept header
+//prefers JSON-LD to HTML, and otherwise "html". Browsers, and clients that accept both equally, get HTML.
+function requestedFormat() {
+  if (isset($_GET["format"]) && $_GET["format"] == "jsonld") {
+    return("jsonld");
+  }
+  if (empty($_SERVER["HTTP_ACCEPT"])) {
+    return("html");
+  }
+  $formats = array("text/html" => "html", "application/xhtml+xml" => "html", "application/ld+json" => "jsonld");
+  $quality = array("html" => -1, "jsonld" => -1);
+  foreach (explode(",", $_SERVER["HTTP_ACCEPT"]) as $range) {
+    $parameters = explode(";", $range);
+    $type = strtolower(trim($parameters[0]));
+    $q = 1.0;
+    foreach (array_slice($parameters, 1) as $parameter) {
+      $pair = explode("=", $parameter, 2);
+      if (strtolower(trim($pair[0])) == "q" && isset($pair[1])) {
+        $q = (float)trim($pair[1]);
+      }
+    }
+    if (isset($formats[$type])) {
+      $quality[$formats[$type]] = max($quality[$formats[$type]], $q);
+    }
+  }
+  return(($quality["jsonld"] > 0 && $quality["jsonld"] > $quality["html"]) ? "jsonld" : "html");
+}
+
+//The address of the JSON-LD describing the current page, or NULL if there is none
+function linkedDataURL() {
+  $page = $GLOBALS["ontomasticon"]["pageInfo"];
+  switch ($page["page_type"]) {
+    case "home":
+      return("/api/cv/");
+    case "cv":
+      return(($page["active_page"] == "") ? null : "/api/cv/?shortname=".rawurlencode($page["active_page"]));
+    case "term":
+      return("/api/term/?term=".rawurlencode(siteURL().rawurldecode($page["active_page"]))."&format=jsonld");
+  }
+  return(null);
 }
 
 function printFooter() {

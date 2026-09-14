@@ -53,10 +53,10 @@ if (!$ready) {
   return;
 }
 
-//Send a request to the test server, keeping the session cookie between requests.
+//Send a request to the test server, with any extra headers, keeping the session cookie between requests.
 //Returns array(status, response headers, body). PHP errors in the page count as failures.
-function httpRequest($method, $path, $fields = null) {
-  $headers = array();
+function httpRequest($method, $path, $fields = null, $extraHeaders = array()) {
+  $headers = $extraHeaders;
   if (isset($GLOBALS["http_cookie"])) {
     $headers[] = "Cookie: ".$GLOBALS["http_cookie"];
   }
@@ -164,6 +164,42 @@ check("with the terms that aren't in a vocabulary", in_array("https://glossary.e
   && !in_array("https://glossary.example.org/cv/calls#calling_song", array_column($graph, "@id")));
 list($status, , $body) = httpRequest("GET", "/api/cv/?shortname=missing");
 check("a missing vocabulary is not found", $status == 404 && $body == "null");
+
+section("HTTP: content negotiation");
+$asJSONLD = array("Accept: application/ld+json");
+list($status, $headers, $body) = httpRequest("GET", "/acoustic_allometry", null, $asJSONLD);
+$concept = json_decode($body, TRUE);
+check("a term's address returns JSON-LD to a client that asks for it", $status == 200 && hasHeader($headers, '#^Content-Type: application/ld\+json#i'));
+checkSame("describing the term", "https://glossary.example.org/acoustic_allometry", is_array($concept) ? $concept["@id"] : null);
+check("and says the response depends on the Accept header", hasHeader($headers, '/^Vary: .*Accept/i'));
+list($status, $headers, $body) = httpRequest("GET", "/acoustic_allometry");
+check("browsers still get the HTML page there", $status == 200 && hasHeader($headers, '#^Content-Type: text/html#i') && strpos($body, "</head>") !== FALSE);
+check("which also varies by Accept header", hasHeader($headers, '/^Vary: .*Accept/i'));
+check("and links to the term's JSON-LD",
+  strpos($body, '<link rel="alternate" type="application/ld+json" href="/api/term/?term=https%3A%2F%2Fglossary.example.org%2Facoustic_allometry&amp;format=jsonld"') !== FALSE);
+list(, , $body) = httpRequest("GET", "/2", null, $asJSONLD);
+$concept = json_decode($body, TRUE);
+checkSame("an opaque term's address uses its id", "https://glossary.example.org/2", is_array($concept) ? $concept["@id"] : null);
+list($status, , $body) = httpRequest("GET", "/1", null, $asJSONLD);
+check("a term that isn't opaque isn't found at its id", $status == 404 && $body == "null");
+list($status) = httpRequest("GET", "/calling_song", null, $asJSONLD);
+checkSame("a term in a vocabulary isn't found outside it", 404, $status);
+list($status, , $body) = httpRequest("GET", "/no_such_term", null, $asJSONLD);
+check("an unknown term is not found", $status == 404 && $body == "null");
+list(, , $body) = httpRequest("GET", "/cv/calls", null, $asJSONLD);
+$ld = json_decode($body, TRUE);
+checkSame("a vocabulary's address returns its scheme", "https://glossary.example.org/cv/calls",
+  (is_array($ld) && isset($ld["@graph"])) ? $ld["@graph"][0]["@id"] : null);
+list(, , $body) = httpRequest("GET", "/", null, $asJSONLD);
+$ld = json_decode($body, TRUE);
+checkSame("the site's address returns the site's own scheme", "https://glossary.example.org/",
+  (is_array($ld) && isset($ld["@graph"])) ? $ld["@graph"][0]["@id"] : null);
+list($status, $headers) = httpRequest("GET", "/cv/calls?format=jsonld");
+check("?format=jsonld works at the same addresses", $status == 200 && hasHeader($headers, '#^Content-Type: application/ld\+json#i'));
+list(, $headers, $body) = httpRequest("GET", "/cv/calls", null, array("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"));
+check("a browser's Accept header gets the vocabulary page", hasHeader($headers, '#^Content-Type: text/html#i') && strpos($body, "Controlled Vocabulary: Calls") !== FALSE);
+list(, , $body) = httpRequest("GET", "/ping", null, $asJSONLD);
+checkSame("other addresses aren't affected", "pong", $body);
 
 section("HTTP: logging in and forms");
 list(, , $body) = httpRequest("GET", "/user/login");
