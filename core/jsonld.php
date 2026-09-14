@@ -135,9 +135,10 @@ function jsonLDReference($node, $reference) {
   return($node);
 }
 
-//A text value, tagged with its language if it has one
+//A text value, tagged with its language if it has one. A language that isn't a valid
+//language tag (such as en_GB) is left out, as it would make the RDF invalid.
 function jsonLDText($text, $language) {
-  if ($language == "") {
+  if (!preg_match('/^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$/', (string)$language)) {
     return((string)$text);
   }
   return(array("@value" => (string)$text, "@language" => $language));

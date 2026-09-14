@@ -17,6 +17,7 @@ if (file_exists("settings/user.css")) {
 if (linkedDataURL() !== null) {
   ?>
   <link rel="alternate" type="application/ld+json" href="<?php print h(linkedDataURL()); ?>" />
+  <link rel="alternate" type="text/turtle" href="<?php print h(linkedDataURL("turtle")); ?>" />
   <?php
 }
 ?>

@@ -23,6 +23,11 @@ function toJSON($value, $flags = 0) {
   return(json_encode($value, $flags | JSON_INVALID_UTF8_SUBSTITUTE));
 }
 
+//Text with any bytes that aren't valid UTF-8 replaced by the replacement character, U+FFFD
+function validUTF8($text) {
+  return(htmlspecialchars_decode(htmlspecialchars((string)$text, ENT_NOQUOTES | ENT_SUBSTITUTE, "UTF-8"), ENT_NOQUOTES));
+}
+
 //Escaped address for a form that posts back to the current page. Uses the address
 //the visitor requested, as PHP_SELF is /index.php under most rewrite configurations.
 function formAction() {

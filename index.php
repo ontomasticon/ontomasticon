@@ -75,10 +75,10 @@ $GLOBALS["ontomasticon"]["cv_count"] = CVcount($db);
 $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
 
 // The site's own addresses also identify its vocabularies and terms. Clients that ask for
-// JSON-LD (see requestedFormat()) get that there instead of the HTML page.
+// JSON-LD or Turtle (see requestedFormat()) get that there instead of the HTML page.
 if (in_array($GLOBALS["ontomasticon"]["pageInfo"]["page_type"], array("home", "cv", "term"))) {
   header("Vary: Accept");
-  if (requestedFormat() == "jsonld") {
+  if (requestedFormat() != "html") {
     template("linked-data.php");
     exit;
   }

@@ -14,4 +14,5 @@ require("core/cv.php");
 require("core/terms.php");
 require("core/model.php");
 require("core/jsonld.php");
+require("core/rdf.php");
 require("core/language.php");

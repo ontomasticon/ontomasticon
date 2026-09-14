@@ -1,7 +1,6 @@
 <?php
-//JSON-LD for the site's own addresses, for clients that ask for it (see requestedFormat()): the site's
-//scheme at /, a vocabulary's scheme at /cv/shortname, and a term outside a vocabulary at its URI
-header('Content-Type: application/ld+json; charset=utf-8');
+//RDF for the site's own addresses, for clients that ask for JSON-LD or Turtle (see requestedFormat()): the
+//site's scheme at /, a vocabulary's scheme at /cv/shortname, and a term outside a vocabulary at its URI
 $page = $GLOBALS["ontomasticon"]["pageInfo"];
 $data = null;
 if ($page["page_type"] == "home") {
@@ -19,9 +18,4 @@ if ($page["page_type"] == "home") {
   }
 }
 
-if ($data === null) {
-  http_response_code(404);
-  print("null");
-} else {
-  print(jsonLDOutput($data));
-}
+printRDF($data, requestedFormat());
