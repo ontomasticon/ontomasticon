@@ -65,6 +65,33 @@ if (!userAllow("administer")) {
     }
   }
 
+  if (!$failed && version_compare($version_db, "0.4", "<")) {
+    $steps = array(
+      //When each term was added and last changed. These aren't known for terms that already exist, so they are left empty.
+      "ALTER TABLE `terms` ADD COLUMN `created` DATETIME NULL AFTER `reference`;",
+      "ALTER TABLE `terms` ADD COLUMN `modified` DATETIME NULL AFTER `created`;",
+      //The prefix for a vocabulary's terms in RDF
+      "ALTER TABLE `cv` ADD COLUMN `prefix` VARCHAR(20) NULL AFTER `reference`;",
+      //Settings for publishing the vocabularies as linked data
+      "INSERT IGNORE INTO `config` VALUES ('publisher', '');",
+      "INSERT IGNORE INTO `config` VALUES ('license', '');",
+      "INSERT IGNORE INTO `config` VALUES ('prefix', '');"
+    );
+    foreach ($steps as $sql) {
+      //1060: the column already exists
+      if (!mysqli_query($db, $sql) && $db->errno != 1060) {
+        $failed = TRUE;
+        print "<div class='error'><p>".t("Update to version 0.4 failed").": ".h($db->error)."</p></div>";
+        break;
+      }
+    }
+    if (!$failed) {
+      $version_db = setDBVersion("0.4");
+      $updated = TRUE;
+      print "<p>".t("Ontomasticon has been updated to version 0.4")."</p>";
+    }
+  }
+
   if ($updated) {
     $GLOBALS["ontomasticon"]["config"] = getConfig($db);
   } elseif (!$failed) {

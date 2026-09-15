@@ -51,9 +51,14 @@ function editCV() {
   $name = trim($_POST['name']);
   $description = trim($_POST['description']);
   $reference = trim($_POST['reference']);
+  $prefix = isset($_POST['prefix']) ? trim($_POST['prefix']) : "";
+  if (prefixError($prefix) !== null) {
+    printError(prefixError($prefix));
+    return(FALSE);
+  }
 
-  $sql = "UPDATE `cv` SET `name` = ?, `description` = ?, `reference` = ? WHERE `shortname` = ?;";
-  $ok = reportSaved(dbQuery($sql, array($name, $description, $reference, $CV)));
+  $sql = "UPDATE `cv` SET `name` = ?, `description` = ?, `reference` = ?, `prefix` = ? WHERE `shortname` = ?;";
+  $ok = reportSaved(dbQuery($sql, array($name, $description, $reference, ($prefix == "") ? null : $prefix, $CV)));
 
   $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
   return($ok);
@@ -65,6 +70,7 @@ function addCV() {
   $name = trim($_POST['name']);
   $description = trim($_POST['description']);
   $reference = trim($_POST['reference']);
+  $prefix = isset($_POST['prefix']) ? trim($_POST['prefix']) : "";
 
   if ($shortname == "") {
     printError(t("Not saved. A short name is required."));
@@ -80,8 +86,13 @@ function addCV() {
     return(FALSE);
   }
 
-  $sql = "INSERT INTO `cv` (`shortname`, `name`, `description`, `reference`) VALUES (?, ?, ?, ?);";
-  $ok = reportSaved(dbQuery($sql, array($shortname, $name, $description, $reference)), "Controlled vocabulary added.");
+  if (prefixError($prefix) !== null) {
+    printError(prefixError($prefix));
+    return(FALSE);
+  }
+
+  $sql = "INSERT INTO `cv` (`shortname`, `name`, `description`, `reference`, `prefix`) VALUES (?, ?, ?, ?, ?);";
+  $ok = reportSaved(dbQuery($sql, array($shortname, $name, $description, $reference, ($prefix == "") ? null : $prefix)), "Controlled vocabulary added.");
 
   $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
   return($ok);

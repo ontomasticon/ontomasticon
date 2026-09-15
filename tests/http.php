@@ -267,11 +267,18 @@ check("changes the password", strpos($body, "Saved.") !== FALSE);
 list($status, , $body) = httpRequest("GET", "/admin/config");
 checkSame("admin pages open once the password is changed", 200, $status);
 check("admin forms post back to the requested address", strpos($body, '<form action="/admin/config"') !== FALSE);
+check("the configuration form has the publishing settings",
+  strpos($body, 'name="publisher"') !== FALSE && strpos($body, 'name="license"') !== FALSE && strpos($body, 'name="prefix"') !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/config", array(
-  "csrf_token" => $token, "site_name" => "Test glossary", "author" => "Tester",
-  "default_lang" => "en", "base_url" => "glossary.example.org/", "description" => "Testing", "submit" => ""
+  "csrf_token" => $token, "site_name" => "Test glossary", "author" => "Tester", "publisher" => "Test publisher",
+  "default_lang" => "en", "base_url" => "glossary.example.org/", "description" => "Testing",
+  "license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "test", "submit" => ""
 ));
 check("saves the site configuration", strpos($body, "Saved.") !== FALSE && strpos($body, "Test glossary") !== FALSE);
+list(, , $body) = httpRequest("GET", "/api/cv/");
+$ld = json_decode($body, TRUE);
+checkSame("the site's scheme then gives the license", array("@id" => "https://creativecommons.org/licenses/by/4.0/"),
+  (is_array($ld) && isset($ld["@graph"][0]["dcterms:license"])) ? $ld["@graph"][0]["dcterms:license"] : null);
 
 list(, , $body) = httpRequest("POST", "/user/login", array("csrf_token" => $token, "logout" => ""));
 check("logs out", strpos($body, "Logged out.") !== FALSE);

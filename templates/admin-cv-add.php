@@ -24,6 +24,11 @@ if (!userAllow("create-cv")) {
     <input type="text" id="reference" name="reference"
            placeholder="">
            <br/><br/>
+    <label for="prefix"><?php print t("Namespace prefix"); ?></label><br/>
+    <small><?php print t("A short prefix for the vocabulary's terms, used in RDF, for example calltype"); ?></small><br/>
+    <input type="text" id="prefix" name="prefix"
+           placeholder="">
+           <br/><br/>
     <button type="submit" name="submit"><?php print t("Save"); ?></button>
   </form>
 <?php

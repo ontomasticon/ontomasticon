@@ -16,6 +16,9 @@ class Term {
   public $broaderID;
   public $invalidReason;
   public $reference;
+  //When the term was added and last changed, as database DATETIMEs in UTC, or NULL if not known
+  public $created;
+  public $modified;
 
   //Related terms that have been loaded, by relation name
   private $related = array();
@@ -25,7 +28,8 @@ class Term {
     $columns = array(
       "id" => "id", "shortname" => "shortname", "name" => "name", "description" => "description",
       "language" => "language", "opaque" => "opaque", "cv" => "cv", "parent" => "parentID",
-      "broader" => "broaderID", "invalid_reason" => "invalidReason", "reference" => "reference"
+      "broader" => "broaderID", "invalid_reason" => "invalidReason", "reference" => "reference",
+      "created" => "created", "modified" => "modified"
     );
     $term = new Term();
     foreach ($columns as $column => $property) {
@@ -214,9 +218,16 @@ class Vocabulary {
   public $description;
   public $reference;
   public $creator;
+  //The prefix for the vocabulary's terms in RDF, or NULL if there isn't one
+  public $prefix;
+  //The site's publisher and license, which apply to all of its vocabularies
+  public $publisher;
+  public $license;
 
   public function __construct($shortname = null) {
     $this->shortname = $shortname;
+    $this->publisher = configValue("publisher");
+    $this->license = configValue("license");
   }
 
   //The vocabulary with a shortname, or NULL if there is no match
@@ -230,14 +241,16 @@ class Vocabulary {
     $vocabulary->name = $row["name"];
     $vocabulary->description = $row["description"];
     $vocabulary->reference = $row["reference"];
+    //The prefix column is added by the 0.4 database update
+    $vocabulary->prefix = isset($row["prefix"]) ? $row["prefix"] : null;
     return($vocabulary);
   }
 
-  //The site's terms that aren't in a vocabulary, described by the site's name, description and author
+  //The site's terms that aren't in a vocabulary, described by the site's name, description, author and prefix
   public static function site() {
     $config = $GLOBALS["ontomasticon"]["config"];
     $vocabulary = new Vocabulary();
-    foreach (array("name" => "site_name", "description" => "description", "creator" => "author") as $property => $key) {
+    foreach (array("name" => "site_name", "description" => "description", "creator" => "author", "prefix" => "prefix") as $property => $key) {
       $vocabulary->$property = isset($config[$key]) ? $config[$key] : null;
     }
     return($vocabulary);
@@ -245,6 +258,11 @@ class Vocabulary {
 
   public function uri() {
     return(siteURL().(($this->shortname === null) ? "" : "cv/".$this->shortname));
+  }
+
+  //The URI the vocabulary's term URIs start with
+  public function namespaceURI() {
+    return(($this->shortname === null) ? siteURL() : $this->uri()."#");
   }
 
   //The vocabulary's terms, including deprecated ones, with their related terms loaded

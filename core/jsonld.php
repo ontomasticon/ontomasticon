@@ -12,7 +12,9 @@ function jsonLDContext() {
     "owl" => "http://www.w3.org/2002/07/owl#",
     "rdf" => "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
     "rdfs" => "http://www.w3.org/2000/01/rdf-schema#",
-    "skos" => "http://www.w3.org/2004/02/skos/core#"
+    "skos" => "http://www.w3.org/2004/02/skos/core#",
+    "vann" => "http://purl.org/vocab/vann/",
+    "xsd" => "http://www.w3.org/2001/XMLSchema#"
   ));
 }
 
@@ -46,6 +48,16 @@ function vocabularyJSONLD($vocabulary, $terms) {
   }
   if ($vocabulary->creator != "") {
     $scheme["dcterms:creator"] = (string)$vocabulary->creator;
+  }
+  if ($vocabulary->publisher != "") {
+    $scheme["dcterms:publisher"] = (string)$vocabulary->publisher;
+  }
+  if (preg_match('#^https?://\S+$#iD', (string)$vocabulary->license) === 1) {
+    $scheme["dcterms:license"] = array("@id" => $vocabulary->license);
+  }
+  if ($vocabulary->prefix != "") {
+    $scheme["vann:preferredNamespacePrefix"] = (string)$vocabulary->prefix;
+    $scheme["vann:preferredNamespaceUri"] = $vocabulary->namespaceURI();
   }
   $scheme = jsonLDReference($scheme, $vocabulary->reference);
 
@@ -121,6 +133,13 @@ function termNode($term) {
   if ($term->isDeprecated()) {
     $node["owl:deprecated"] = TRUE;
   }
+
+  //TDWG gives when terms were created and modified as dates
+  foreach (array("dcterms:created" => $term->created, "dcterms:modified" => $term->modified) as $property => $datetime) {
+    if (jsonLDDate($datetime) !== null) {
+      $node[$property] = jsonLDDate($datetime);
+    }
+  }
   return(jsonLDReference($node, $term->reference));
 }
 
@@ -142,6 +161,14 @@ function jsonLDText($text, $language) {
     return((string)$text);
   }
   return(array("@value" => (string)$text, "@language" => $language));
+}
+
+//The date of a database DATETIME as an xsd:date value, or NULL if there is no date
+function jsonLDDate($datetime) {
+  if (preg_match('/^([0-9]{4}-[0-9]{2}-[0-9]{2})/', (string)$datetime, $matches) !== 1 || $matches[1] == "0000-00-00") {
+    return(null);
+  }
+  return(array("@value" => $matches[1], "@type" => "xsd:date"));
 }
 
 function jsonLDLink($term) {

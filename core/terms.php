@@ -191,7 +191,7 @@ function editTerm() {
   }
 
   $sql  = "UPDATE `terms` SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, ";
-  $sql .= "`invalid_reason` = ?, `cv` = ?, `parent` = ?, `broader` = ?, `reference` = ? ";
+  $sql .= "`invalid_reason` = ?, `cv` = ?, `parent` = ?, `broader` = ?, `reference` = ?, `modified` = UTC_TIMESTAMP() ";
   $sql .= "WHERE `shortname` = ?;";
   return(reportSaved(dbQuery($sql, array(
     $name,
@@ -238,8 +238,8 @@ function addTerm() {
     return(FALSE);
   }
 
-  $sql  = "INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`) ";
-  $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+  $sql  = "INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`, `created`, `modified`) ";
+  $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP());";
   return(reportSaved(dbQuery($sql, array(
     $shortname,
     $name,

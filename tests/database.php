@@ -70,11 +70,15 @@ resetDatabase("inst/ontomasticon.sql");
 checkSame("database version matches the code", (string)$version, (string)$GLOBALS["ontomasticon"]["config"]["version_db"]);
 check("terms have a reference column", $db->query("SELECT `reference` FROM `terms` LIMIT 1;") !== FALSE);
 check("the login_attempts table exists", $db->query("SELECT 1 FROM `login_attempts` LIMIT 1;") !== FALSE);
+check("terms have created and modified columns", $db->query("SELECT `created`, `modified` FROM `terms` LIMIT 1;") !== FALSE);
+check("vocabularies have a prefix column", $db->query("SELECT `prefix` FROM `cv` LIMIT 1;") !== FALSE);
+check("the linked data settings exist", count(array_intersect(array("publisher", "license", "prefix"), array_keys(getConfig()))) == 3);
 
 section("Adding terms");
 termForm(array("shortname" => "sound", "name" => "Sound"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("adds a term", $ok && termRow("sound") != null);
+check("records when the term was added", termRow("sound")["created"] !== null && termRow("sound")["modified"] === termRow("sound")["created"]);
 termForm(array("shortname" => "sound", "name" => "Duplicate"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("refuses a short name that is already used", !$ok && strpos($out, "already a term") !== FALSE);
@@ -167,9 +171,14 @@ checkSame("a term without a broader term has none", null, $siteTerms["sound"]->b
 
 section("Editing terms");
 $GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "admin", "active_page" => "term", "active_subpage" => "edit", "active_subsubpage" => "bird_song");
+dbQuery("UPDATE `terms` SET `created` = '2020-01-01 09:00:00', `modified` = '2020-01-01 09:00:00' WHERE `shortname` = 'bird_song';");
 termForm(array("name" => "Birdsong", "parent" => "sound", "reference" => "Jones 2021"));
 list($out, $ok) = capture(function() { return(editTerm()); });
 check("saves changes", $ok && termRow("bird_song")["name"] == "Birdsong" && termRow("bird_song")["reference"] == "Jones 2021");
+check("records when the term was changed, but not when it was added",
+  termRow("bird_song")["created"] == "2020-01-01 09:00:00" && termRow("bird_song")["modified"] > "2020-01-01 09:00:00");
+checkSame("gives when the term was added as a date in JSON-LD", array("@value" => "2020-01-01", "@type" => "xsd:date"),
+  termJSONLD(Term::find("bird_song"))["dcterms:created"]);
 termForm(array("name" => "Changed", "parent" => "missing"));
 list($out, $ok) = capture(function() { return(editTerm()); });
 check("refuses a parent term that doesn't exist", !$ok && termRow("bird_song")["name"] == "Birdsong");
@@ -182,14 +191,18 @@ checkSame("clears parent links to it", null, termRow("bird_song")["parent"]);
 checkSame("clears broader links to it", null, termRow("animal_sound")["broader"]);
 
 section("Controlled vocabularies");
-$_POST = array("shortname" => "birds", "name" => "Birds", "description" => "", "reference" => "");
+$_POST = array("shortname" => "birds", "name" => "Birds", "description" => "", "reference" => "", "prefix" => "birds");
 list($out, $ok) = capture(function() { return(addCV()); });
 check("adds a vocabulary", $ok && array_key_exists("birds", getCVs()));
+checkSame("with its namespace prefix", "birds", getCVs()["birds"]["prefix"]);
 list($out, $ok) = capture(function() { return(addCV()); });
 check("refuses a short name that is already used", !$ok && strpos($out, "already a controlled vocabulary") !== FALSE);
 $_POST["shortname"] = "bird calls";
 list($out, $ok) = capture(function() { return(addCV()); });
 check("refuses a short name that isn't safe in a URI", !$ok && strpos($out, "can only use the letters") !== FALSE && !array_key_exists("bird calls", getCVs()));
+$_POST = array("shortname" => "insects", "name" => "Insects", "description" => "", "reference" => "", "prefix" => "1insects");
+list($out, $ok) = capture(function() { return(addCV()); });
+check("refuses a namespace prefix that doesn't start with a letter", !$ok && strpos($out, "namespace prefix must") !== FALSE && !array_key_exists("insects", getCVs()));
 termForm(array("shortname" => "robin", "name" => "Robin", "cv" => "birds"));
 capture(function() { return(addTerm()); });
 termForm(array("shortname" => "wren_song", "name" => "Wren song", "parent" => "robin"));
@@ -202,6 +215,10 @@ checkSame("with its terms", array("robin"), $shortnames($birdTerms));
 checkSame("and their child terms, even outside the vocabulary", array("wren_song"), (count($birdTerms) > 0) ? $shortnames($birdTerms[0]->children()) : null);
 checkSame("its JSON-LD scheme is at the vocabulary's address", "https://glossary.example.org/cv/birds",
   ($birds != null) ? vocabularyJSONLD($birds, $birdTerms)["@graph"][0]["@id"] : null);
+$birdScheme = ($birds != null) ? vocabularyJSONLD($birds, $birdTerms)["@graph"][0] : array();
+checkSame("and gives its namespace prefix and URI", array("birds", "https://glossary.example.org/cv/birds#"),
+  array(isset($birdScheme["vann:preferredNamespacePrefix"]) ? $birdScheme["vann:preferredNamespacePrefix"] : null,
+    isset($birdScheme["vann:preferredNamespaceUri"]) ? $birdScheme["vann:preferredNamespaceUri"] : null));
 termForm(array("shortname" => "api", "name" => "API", "cv" => "birds"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("allows a term in a vocabulary to use a short name the site uses for its own pages", $ok && termRow("api") != null);
@@ -232,9 +249,42 @@ list($out, $ok) = capture(function() { return(editTerm()); });
 check("editing refuses to make a term whose short name is made only of digits not opaque",
   !$ok && strpos($out, "only of digits") !== FALSE && termRow("1990")["opaque"] == 1);
 $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "birds";
+$_POST = array("name" => "Birds", "description" => "", "reference" => "", "prefix" => "aves");
+list($out, $ok) = capture(function() { return(editCV()); });
+check("editing a vocabulary changes its namespace prefix", $ok && getCVs()["birds"]["prefix"] == "aves");
+$_POST["prefix"] = "has space";
+list($out, $ok) = capture(function() { return(editCV()); });
+check("but refuses one that can't be used", !$ok && getCVs()["birds"]["prefix"] == "aves");
 list($out, $ok) = capture(function() { return(deleteCV()); });
 check("deletes the vocabulary and its terms", $ok && !array_key_exists("birds", getCVs()) && termRow("robin") == null);
 checkSame("clears links from other terms to the deleted terms", null, termRow("wren_song")["parent"]);
+
+section("Site configuration");
+$_POST = array("site_name" => "Glossary", "author" => "A. Author", "publisher" => "Natural History Museum", "default_lang" => "en",
+  "base_url" => "glossary.example.org/", "description" => "Terms.", "license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "gl");
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("saves the settings, including the linked data ones", $ok && getConfig()["publisher"] == "Natural History Museum"
+  && getConfig()["license"] == "https://creativecommons.org/licenses/by/4.0/" && getConfig()["prefix"] == "gl");
+$scheme = vocabularyJSONLD(Vocabulary::site(), array())["@graph"][0];
+checkSame("the site's scheme gives the license", array("@id" => "https://creativecommons.org/licenses/by/4.0/"),
+  isset($scheme["dcterms:license"]) ? $scheme["dcterms:license"] : null);
+checkSame("and the publisher", "Natural History Museum", isset($scheme["dcterms:publisher"]) ? $scheme["dcterms:publisher"] : null);
+checkSame("and the namespace prefix and URI", array("gl", "https://glossary.example.org/"),
+  array(isset($scheme["vann:preferredNamespacePrefix"]) ? $scheme["vann:preferredNamespacePrefix"] : null,
+    isset($scheme["vann:preferredNamespaceUri"]) ? $scheme["vann:preferredNamespaceUri"] : null));
+$_POST["license"] = "CC BY 4.0";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("refuses a license that isn't a web address, saving nothing",
+  !$ok && strpos($out, "license must be a web address") !== FALSE && getConfig()["license"] == "https://creativecommons.org/licenses/by/4.0/");
+$_POST["license"] = "";
+$_POST["prefix"] = "g l";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("refuses a namespace prefix that can't be used", !$ok && strpos($out, "namespace prefix must") !== FALSE && getConfig()["prefix"] == "gl");
+dbQuery("DELETE FROM `config` WHERE `key` = 'publisher';");
+$_POST["prefix"] = "gl";
+$_POST["publisher"] = "Restored publisher";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("saves a setting whose row is missing, as before the update that adds it", $ok && getConfig()["publisher"] == "Restored publisher");
 
 section("Users and logging in");
 $_POST = array("first_name" => "Ada", "surname" => "Editor", "email" => " ada@example.org ", "password" => " correct horse ", "role" => "editor");
@@ -325,9 +375,15 @@ check("adds the reference column", $db->query("SELECT `reference` FROM `terms` L
 $db->query("DELETE FROM `users` WHERE `password` = 'y';");
 $out = runUpdate();
 check("runs the 0.3 step once the duplicate is removed", strpos($out, "updated to version 0.3") !== FALSE);
-checkSame("leaves the database at 0.3", "0.3", (string)getConfig()["version_db"]);
+check("and then the 0.4 step", strpos($out, "updated to version 0.4") !== FALSE);
+checkSame("leaving the database at 0.4", "0.4", (string)getConfig()["version_db"]);
 check("email addresses must now be unique", !$db->query("INSERT INTO `users` (`email`) VALUES ('twice@example.org');"));
 check("creates the login_attempts table", $db->query("SELECT 1 FROM `login_attempts` LIMIT 1;") !== FALSE);
 $orphan = termRow("orphan");
 check("clears links to terms that don't exist", $orphan["parent"] === null && $orphan["broader"] === null);
+check("adds the created and modified columns, leaving existing terms without dates",
+  array_key_exists("created", $orphan) && $orphan["created"] === null && $orphan["modified"] === null);
+check("adds the vocabulary prefix column", $db->query("SELECT `prefix` FROM `cv` LIMIT 1;") !== FALSE);
+checkSame("and the linked data settings, empty", array("", "", ""),
+  array(getConfig()["publisher"], getConfig()["license"], getConfig()["prefix"]));
 check("running it again changes nothing", strpos(runUpdate(), "No updates required") !== FALSE);
