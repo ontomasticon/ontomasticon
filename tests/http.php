@@ -191,7 +191,7 @@ list(, , $body) = httpRequest("GET", "/api/term/?term=".rawurlencode("https://gl
 $concept = json_decode($body, TRUE);
 checkSame("finds an opaque term from its URL", "https://glossary.example.org/2", is_array($concept) ? $concept["@id"] : null);
 list($status, , $body) = httpRequest("GET", "/api/term/?shortname=missing&format=jsonld");
-check("a missing term is not found", $status == 404 && $body == "null");
+check("a missing term is not found", $status == 404 && $body === "");
 
 section("HTTP: vocabularies");
 $db->query("INSERT INTO ".table("cv")." (`shortname`, `name`, `description`, `reference`) VALUES ('calls', 'Calls', '<p>Types of call.</p>', '');");
@@ -214,7 +214,7 @@ checkSame("without a short name, returns the site's own scheme", "https://glossa
 check("with the terms that aren't in a vocabulary", in_array("https://glossary.example.org/acoustic_allometry", array_column($graph, "@id"))
   && !in_array("https://glossary.example.org/cv/calls#calling_song", array_column($graph, "@id")));
 list($status, , $body) = httpRequest("GET", "/api/cv/?shortname=missing");
-check("a missing vocabulary is not found", $status == 404 && $body == "null");
+check("a missing vocabulary is not found", $status == 404 && $body === "");
 $db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('opaque_call', 'Opaque call', 'en', 1, 'calls');");
 $opaqueCall = getTerm("opaque_call");
 list(, , $body) = httpRequest("GET", "/cv/calls");
@@ -240,11 +240,11 @@ list(, , $body) = httpRequest("GET", "/2", null, $asJSONLD);
 $concept = json_decode($body, TRUE);
 checkSame("an opaque term's address uses its id", "https://glossary.example.org/2", is_array($concept) ? $concept["@id"] : null);
 list($status, , $body) = httpRequest("GET", "/1", null, $asJSONLD);
-check("a term that isn't opaque isn't found at its id", $status == 404 && $body == "null");
+check("a term that isn't opaque isn't found at its id", $status == 404 && $body === "");
 list($status) = httpRequest("GET", "/calling_song", null, $asJSONLD);
 checkSame("a term in a vocabulary isn't found outside it", 404, $status);
 list($status, , $body) = httpRequest("GET", "/no_such_term", null, $asJSONLD);
-check("an unknown term is not found", $status == 404 && $body == "null");
+check("an unknown term is not found", $status == 404 && $body === "");
 list(, , $body) = httpRequest("GET", "/cv/calls", null, $asJSONLD);
 $ld = json_decode($body, TRUE);
 checkSame("a vocabulary's address returns its scheme", "https://glossary.example.org/cv/calls",

@@ -549,6 +549,13 @@ $turtle = turtleOutput(vocabularyJSONLD($callType, array($premating, $song, $syn
 checkSame("writes a vocabulary as its scheme followed by each of its terms", 5, preg_match_all('/^</m', $turtle));
 check("starting with the scheme", strpos($turtle, "\n<https://glossary.example.org/cv/callType> a skos:ConceptScheme ;\n") !== FALSE);
 check("with the same values as the JSON-LD", strpos($turtle, '    skos:definition "The female’s response."@en ;') !== FALSE);
+$notFound = array();
+foreach (array("jsonld", "turtle") as $format) {
+  ob_start();
+  printRDF(null, $format);
+  $notFound[] = ob_get_clean();
+}
+checkSame("something that isn't there has an empty body, in JSON-LD as in Turtle", array("", ""), $notFound);
 
 section("Dates and publishing settings");
 checkSame("a database date and time gives an xsd:date", array("@value" => "2026-09-14", "@type" => "xsd:date"), jsonLDDate("2026-09-14 16:05:00"));
