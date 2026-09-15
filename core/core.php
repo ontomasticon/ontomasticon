@@ -15,5 +15,6 @@ require("core/terms.php");
 require("core/model.php");
 require("core/jsonld.php");
 require("core/rdf.php");
+require("core/schemaorg.php");
 require("core/readiness.php");
 require("core/language.php");

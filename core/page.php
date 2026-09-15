@@ -226,6 +226,26 @@ function canonicalURL() {
   return(null);
 }
 
+//The schema.org data for the current page, as an array ready for schemaOrgScript(): the site's terms as a set on the
+//home page, a term on its page, and a vocabulary with its terms on its page. NULL for other pages, including addresses that aren't found.
+function pageStructuredData() {
+  $page = $GLOBALS["ontomasticon"]["pageInfo"];
+  if ($page["page_type"] == "home") {
+    $vocabulary = Vocabulary::site();
+    return(schemaOrgTermSetJSONLD($vocabulary, $vocabulary->terms()));
+  }
+  if (currentPageTerm() !== null) {
+    $term = Term::fromRow(currentPageTerm());
+    $vocabulary = ($term->cv == null) ? Vocabulary::site() : Vocabulary::find($term->cv);
+    return(schemaOrgTermJSONLD($term, ($vocabulary === null) ? $term->vocabulary() : $vocabulary));
+  }
+  if (currentPageVocabulary() !== null) {
+    $vocabulary = Vocabulary::find(currentPageVocabulary()["shortname"]);
+    return(($vocabulary === null) ? null : schemaOrgTermSetJSONLD($vocabulary, $vocabulary->terms()));
+  }
+  return(null);
+}
+
 function printFooter() {
   $out  = "<p>".t("Powered by")." ";
   $out .= l("Ontomasticon", "https://ontomasticon.github.io")." ";
