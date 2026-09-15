@@ -377,9 +377,9 @@ list($status, , $body) = httpRequest("GET", "/admin/config");
 checkSame("admin pages open once the password is changed", 200, $status);
 check("admin forms post back to the requested address", strpos($body, '<form action="/admin/config"') !== FALSE);
 check("the admin menu links to the configuration page", strpos($body, "<a href='/admin/config'>Configure site</a>") !== FALSE);
-list(, $headers, $body) = httpRequest("GET", "/");
+list(, $homeHeaders, $homeBody) = httpRequest("GET", "/");
 check("while logged in, public pages aren't kept, so edits show at once",
-  hasHeader($headers, '/^Cache-Control: .*no-store/i') && !hasHeader($headers, '/^Cache-Control: public/i') && strpos($body, "Administration</a>") !== FALSE);
+  hasHeader($homeHeaders, '/^Cache-Control: .*no-store/i') && !hasHeader($homeHeaders, '/^Cache-Control: public/i') && strpos($homeBody, "Administration</a>") !== FALSE);
 check("the configuration form has the publishing settings",
   strpos($body, 'name="publisher"') !== FALSE && strpos($body, 'name="license"') !== FALSE && strpos($body, 'name="prefix"') !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/config", array(
