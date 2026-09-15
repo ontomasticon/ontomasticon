@@ -6,14 +6,13 @@
 // JSON-LD (see core/jsonld.php), so both formats always describe the same RDF.
 
 //Send RDF made by termJSONLD() or vocabularyJSONLD() as $format ("jsonld" or "turtle"),
-//or a "not found" response in that format if $data is NULL
+//or a "not found" response with an empty body if $data is NULL
 function printRDF($data, $format) {
   $turtle = ($format == "turtle");
   header(($turtle) ? "Content-Type: text/turtle; charset=utf-8" : "Content-Type: application/ld+json; charset=utf-8");
   if ($data === null) {
+    //The status says there is nothing there. The body is empty in both formats, as null isn't a JSON-LD document.
     http_response_code(404);
-    //An empty document is valid Turtle
-    print(($turtle) ? "" : "null");
     return;
   }
   print(($turtle) ? turtleOutput($data) : jsonLDOutput($data));
