@@ -38,15 +38,16 @@ if (!validTablePrefix(tablePrefix())) {
 // Load configuration. Its base_url gives the path the site is installed at, which routing and the session cookie need.
 $GLOBALS["ontomasticon"]["config"] = getConfig($db);
 
-// Start the session before any output is sent. The cookie is limited to the site's own path,
-// so sites installed in different subdirectories of one domain don't share a login.
-session_start(array(
-  "cookie_httponly" => TRUE,
-  "cookie_samesite" => "Lax",
-  "cookie_secure" => requestIsHttps(),
-  "cookie_path" => basePath()."/",
-  "use_strict_mode" => TRUE
-));
+$GLOBALS["ontomasticon"]["pageInfo"] = activePage();
+
+// Start a session only for the visitors who need one (see sessionNeeded()). PHP tells browsers not to keep pages that
+// use a session; other pages may be kept for a few minutes, but not once the visitor's cookies change, as on logging in.
+if (sessionNeeded($GLOBALS["ontomasticon"]["pageInfo"])) {
+  startSession();
+} elseif (in_array($_SERVER["REQUEST_METHOD"], array("GET", "HEAD"), TRUE)) {
+  header("Cache-Control: public, max-age=".PUBLIC_CACHE_SECONDS);
+  header("Vary: Cookie", FALSE);
+}
 
 // Ignore form submissions that don't carry this session's CSRF token
 $GLOBALS["ontomasticon"]["csrf_failed"] = FALSE;
@@ -54,8 +55,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && !csrfValid()) {
   $_POST = array();
   $GLOBALS["ontomasticon"]["csrf_failed"] = TRUE;
 }
-
-$GLOBALS["ontomasticon"]["pageInfo"] = activePage();
 
 // Log in or out before any output, as both change the session id
 if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "user" && $GLOBALS["ontomasticon"]["pageInfo"]["active_page"] == "login") {
@@ -87,7 +86,7 @@ $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
 // The site's own addresses also identify its vocabularies and terms. Clients that ask for
 // JSON-LD or Turtle (see requestedFormat()) get that there instead of the HTML page.
 if (in_array($GLOBALS["ontomasticon"]["pageInfo"]["page_type"], array("home", "cv", "term"))) {
-  header("Vary: Accept");
+  header("Vary: Accept", FALSE);
   if (requestedFormat() != "html") {
     template("linked-data.php");
     exit;

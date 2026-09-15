@@ -303,6 +303,25 @@ check("rejects a token sent as an array", !csrfValid());
 $_POST = array();
 check("rejects a missing token", !csrfValid());
 
+section("Sessions");
+function sessionFor($pageInfo, $method = "GET", $get = array(), $cookies = array()) {
+  $_SERVER["REQUEST_METHOD"] = $method;
+  $_GET = $get;
+  $_COOKIE = $cookies;
+  return(sessionNeeded($pageInfo));
+}
+check("a visitor to a public page, or its linked data, doesn't need a session", !sessionFor(array("page_type" => "home"))
+  && !sessionFor(array("page_type" => "term", "active_page" => "acoustic_allometry")) && !sessionFor(array("page_type" => "api", "active_page" => "cv")));
+check("login, user and administration pages do, including the database update",
+  sessionFor(array("page_type" => "user", "active_page" => "login")) && sessionFor(array("page_type" => "admin", "active_page" => "update")));
+check("as does submitting a form", sessionFor(array("page_type" => "home"), "POST"));
+check("and a visitor who already has a session, who may be logged in", sessionFor(array("page_type" => "home"), "GET", array(), array(session_name() => "abc")));
+check("choosing one of the site's languages needs one, to remember it", sessionFor(array("page_type" => "home"), "GET", array("lang" => "en")));
+check("but not a language the site isn't offered in", !sessionFor(array("page_type" => "home"), "GET", array("lang" => "xx")));
+$_GET = array();
+$_COOKIE = array();
+unset($_SERVER["REQUEST_METHOD"]);
+
 section("Roles");
 $roles = userRoles();
 check("admin can do everything", in_array("*", $roles["administer"]["tasks"]));

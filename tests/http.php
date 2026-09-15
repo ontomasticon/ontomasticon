@@ -94,8 +94,18 @@ section("HTTP: pages");
 list($status, $headers, $body) = httpRequest("GET", "/");
 checkSame("home page loads", 200, $status);
 check("home page closes its head element", strpos($body, "</head>") !== FALSE);
-check("session cookie is HttpOnly and SameSite=Lax",
+check("without starting a session for the visitor", !hasHeader($headers, '/^Set-Cookie:/i'));
+check("so browsers and crawlers may keep it for five minutes", hasHeader($headers, '/^Cache-Control: public, max-age=300$/i') && !hasHeader($headers, '/no-store/i'));
+check("but not once their cookies change, as they do on logging in", hasHeader($headers, '/^Vary: .*Cookie/i') && hasHeader($headers, '/^Vary: .*Accept/i'));
+list(, $headers) = httpRequest("GET", "/api/cv/?format=ttl");
+check("linked data doesn't start a session either, and may be kept", !hasHeader($headers, '/^Set-Cookie:/i') && hasHeader($headers, '/^Cache-Control: public/i'));
+list(, $headers) = httpRequest("GET", "/user/login");
+check("the login page starts a session, with a cookie that is HttpOnly and SameSite=Lax",
   hasHeader($headers, '/^Set-Cookie: PHPSESSID=.*HttpOnly/i') && hasHeader($headers, '/^Set-Cookie: PHPSESSID=.*SameSite=Lax/i'));
+check("and isn't kept", hasHeader($headers, '/^Cache-Control: .*no-store/i') && !hasHeader($headers, '/^Cache-Control: public/i'));
+list(, $headers) = httpRequest("GET", "/");
+check("a visitor with a session isn't given pages to keep", !hasHeader($headers, '/^Cache-Control: public/i'));
+unset($GLOBALS["http_cookie"]);
 list($status) = httpRequest("GET", "/css/default.css");
 checkSame("serves static files directly", 200, $status);
 list(, , $body) = httpRequest("GET", "/ping");
@@ -367,6 +377,9 @@ list($status, , $body) = httpRequest("GET", "/admin/config");
 checkSame("admin pages open once the password is changed", 200, $status);
 check("admin forms post back to the requested address", strpos($body, '<form action="/admin/config"') !== FALSE);
 check("the admin menu links to the configuration page", strpos($body, "<a href='/admin/config'>Configure site</a>") !== FALSE);
+list(, $headers, $body) = httpRequest("GET", "/");
+check("while logged in, public pages aren't kept, so edits show at once",
+  hasHeader($headers, '/^Cache-Control: .*no-store/i') && !hasHeader($headers, '/^Cache-Control: public/i') && strpos($body, "Administration</a>") !== FALSE);
 check("the configuration form has the publishing settings",
   strpos($body, 'name="publisher"') !== FALSE && strpos($body, 'name="license"') !== FALSE && strpos($body, 'name="prefix"') !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/config", array(
@@ -403,7 +416,6 @@ $db->query("UPDATE ".table("config")." SET `value` = 'glossary.example.org/sub/'
 unset($GLOBALS["http_cookie"]);
 list($status, $headers, $body) = httpRequest("GET", "/sub/");
 checkSame("the home page loads at the subdirectory", 200, $status);
-check("the session cookie is limited to the subdirectory", hasHeader($headers, '#^Set-Cookie: PHPSESSID=.*path=/sub/;#i'));
 check("the stylesheet and links are in the subdirectory",
   strpos($body, 'href="/sub/css/default.css"') !== FALSE && strpos($body, "href='/sub/user/login'") !== FALSE);
 list(, , $body) = httpRequest("GET", "/sub/cv/calls");
@@ -418,7 +430,8 @@ check("its page is there too, with the subdirectory in its canonical address",
 list(, , $body) = httpRequest("GET", "/sub/robots.txt");
 check("robots.txt and the sitemap use the subdirectory",
   strpos($body, "Disallow: /sub/admin/\n") !== FALSE && strpos($body, "Sitemap: https://glossary.example.org/sub/sitemap.xml") !== FALSE);
-list(, , $body) = httpRequest("GET", "/sub/user/login");
+list(, $headers, $body) = httpRequest("GET", "/sub/user/login");
+check("the session cookie is limited to the subdirectory", hasHeader($headers, '#^Set-Cookie: PHPSESSID=.*path=/sub/;#i'));
 preg_match("/name='csrf_token' value='([0-9a-f]{64})'/", $body, $matches);
 check("the login form posts back to the subdirectory", strpos($body, '<form action="/sub/user/login"') !== FALSE);
 httpRequest("POST", "/sub/user/login", array("csrf_token" => isset($matches[1]) ? $matches[1] : "", "email" => "admin", "password" => "n3w-secret", "submit" => ""));
