@@ -7,12 +7,12 @@
 <meta name="Generator" content="Ontomasticon (https://ontomasticon.github.io/)"/>
 <meta name="author" content="<?php print h($GLOBALS["ontomasticon"]["config"]["author"]); ?>">
 <meta name="description" content="<?php print h(pageDescription()); ?>">
-<link rel="stylesheet" type="text/css" href="<?php print h(sitePath("/css/default.css")); ?>" />
+<link rel="stylesheet" type="text/css" href="<?php print h(assetPath("/css/default.css")); ?>" />
 <link rel="icon" type="image/png" href="<?php print h(sitePath("/images/ontomasticon.png")); ?>">
 <?php
 if (file_exists("settings/user.css")) {
   ?>
-  <link rel="stylesheet" type="text/css" href="<?php print h(sitePath("/settings/user.css")); ?>" />
+  <link rel="stylesheet" type="text/css" href="<?php print h(assetPath("/settings/user.css")); ?>" />
   <?php
 }
 if (canonicalURL() !== null) {
@@ -37,7 +37,7 @@ if (searchPage()) {
   <?php
 }
 ?>
-<script src="<?php print h(sitePath("/js/search.js")); ?>" defer></script>
+<script src="<?php print h(assetPath("/js/search.js")); ?>" defer></script>
 </head>
 
 <body>

@@ -254,6 +254,14 @@ check("a term's address is a page for that term alone",
 check("titled with the term's name, then the site's", strpos($body, "<title>Acoustic allometry – Site name.</title>") !== FALSE);
 check("with the term's URI as its canonical address", strpos($body, '<link rel="canonical" href="https://glossary.example.org/acoustic_allometry" />') !== FALSE);
 check("and a link to all the terms", strpos($body, "<a href='/'>All terms</a>") !== FALSE);
+$db->query("UPDATE ".table("terms")." SET `description` = 'Cites [1] and [2].', `reference` = 'Krause 2015\nhttps://doi.org/10.1000/example' WHERE `shortname` = 'acoustic_allometry';");
+list(, , $body) = httpRequest("GET", "/acoustic_allometry");
+check("a term with several references lists them, numbered",
+  strpos($body, "<ol class='term-references'><li>Krause 2015</li><li>https://doi.org/10.1000/example</li></ol>") !== FALSE);
+$concept = json_decode(httpRequest("GET", "/api/term/?shortname=acoustic_allometry&format=jsonld")[2], TRUE);
+checkSame("and its JSON-LD gives each of them", array("Krause 2015", array("@id" => "https://doi.org/10.1000/example")),
+  is_array($concept) ? array($concept["dcterms:bibliographicCitation"], $concept["dcterms:source"]) : null);
+$db->query("UPDATE ".table("terms")." SET `description` = NULL, `reference` = NULL WHERE `shortname` = 'acoustic_allometry';");
 list(, , $body) = httpRequest("GET", "/2");
 check("an opaque term's page is at its id", strpos($body, 'id="2"') !== FALSE && strpos($body, "<title>Opaque term – Site name.</title>") !== FALSE);
 list($status, , $body) = httpRequest("GET", "/no_such_term");
@@ -287,7 +295,7 @@ unset($GLOBALS["http_cookie"]);
 list(, , $body) = httpRequest("GET", "/");
 check("pages have a search box that opens the search page", strpos($body, '<form id="term-search" role="search" action="/" method="get"') !== FALSE
   && strpos($body, 'name="q" value=""') !== FALSE);
-check("with the script that suggests terms, and where to get them", strpos($body, '<script src="/js/search.js" defer></script>') !== FALSE
+check("with the script that suggests terms, and where to get them", preg_match('#<script src="/js/search\.js\?v=[0-9]+" defer></script>#', $body) === 1
   && strpos($body, 'data-suggestions="/api/search/"') !== FALSE);
 list($status) = httpRequest("GET", "/js/search.js");
 checkSame("the script is served directly", 200, $status);
@@ -458,7 +466,7 @@ unset($GLOBALS["http_cookie"]);
 list($status, $headers, $body) = httpRequest("GET", "/sub/");
 checkSame("the home page loads at the subdirectory", 200, $status);
 check("the stylesheet and links are in the subdirectory",
-  strpos($body, 'href="/sub/css/default.css"') !== FALSE && strpos($body, "href='/sub/user/login'") !== FALSE);
+  preg_match('#href="/sub/css/default\.css\?v=[0-9]+"#', $body) === 1 && strpos($body, "href='/sub/user/login'") !== FALSE);
 list(, , $body) = httpRequest("GET", "/sub/cv/calls");
 check("vocabulary pages are found in the subdirectory", strpos($body, "Controlled Vocabulary: Calls") !== FALSE);
 list($status, , $body) = httpRequest("GET", "/sub/acoustic_allometry", null, $asJSONLD);

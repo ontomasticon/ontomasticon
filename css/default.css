@@ -272,6 +272,23 @@ pre {
   color: var(--muted);
 }
 
+/* Several references, numbered the way a definition cites them: [1], [2] */
+.term-references {
+  margin: 0.25rem 0 0.4rem;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: reference;
+}
+
+.term-references li {
+  margin: 0.15rem 0;
+  counter-increment: reference;
+}
+
+.term-references li::before {
+  content: "[" counter(reference) "] ";
+}
+
 .invalid_reason {
   font-weight: 600;
 }

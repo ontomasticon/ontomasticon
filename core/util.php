@@ -136,6 +136,20 @@ function sitePath($path) {
   return(basePath().$path);
 }
 
+//The address of one of the site's own files, such as its stylesheet or script, with the time the file last changed added
+//as ?v=, so browsers fetch the file again when it changes rather than using a copy they kept
+function assetPath($path) {
+  $file = ltrim($path, "/");
+  return(sitePath($path).(is_file($file) ? "?v=".filemtime($file) : ""));
+}
+
+//The references in a term's or vocabulary's reference field: one per line, with blank lines left out. A <br> also
+//separates references, as that was the only way to separate them before the field had several lines.
+function referenceList($reference) {
+  $lines = array_map("trim", preg_split('#\r\n|\r|\n|<br\s*/?>#i', (string)$reference));
+  return(array_values(array_filter($lines, function($line) { return($line !== ""); })));
+}
+
 //Short names of terms and vocabularies are used as they are in URIs (the site address followed by
 //the name, cv/name, and cv/vocabulary#name), so they may only use letters A to Z, digits, hyphens,
 //underscores and full stops. A leading full stop is refused too: paths such as /. and /.. are

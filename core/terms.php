@@ -475,7 +475,8 @@ function editTerm() {
   $opaque = (isset($_POST["opaque"]) ? 1 : 0);
   $cv = ((!isset($_POST["cv"]) || $_POST["cv"]=="none") ? "" : trim($_POST['cv']));
   $invalid = ((!isset($_POST["invalid"]) || $_POST["invalid"]=="none") ? "" : trim($_POST['invalid']));
-  $reference = trim($_POST['reference']);
+  //One reference per line (see referenceList())
+  $reference = implode("\n", referenceList($_POST['reference']));
   //Moving a term out of a vocabulary, or making it not opaque, can give it a URI it can't use. A term saved with
   //such a URI before this was checked can still be edited, as long as the edit doesn't add a different problem.
   $clash = termShortnameClash($shortname, $cv, $opaque);
@@ -538,7 +539,8 @@ function addTerm() {
   $opaque = (isset($_POST["opaque"]) ? 1 : 0);
   $cv = ((!isset($_POST["cv"]) || $_POST["cv"]=="none") ? "" : trim($_POST['cv']));
   $invalid = ((!isset($_POST["invalid"]) || $_POST["invalid"]=="none") ? "" : trim($_POST['invalid']));
-  $reference = trim($_POST['reference']);
+  //One reference per line (see referenceList())
+  $reference = implode("\n", referenceList($_POST['reference']));
   $clash = termShortnameClash($shortname, $cv, $opaque);
   if ($clash !== null) {
     printError($clash);

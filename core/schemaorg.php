@@ -32,9 +32,10 @@ function schemaOrgTermSetJSONLD($vocabulary, $terms) {
   if (preg_match('#^https?://\S+$#iD', (string)$vocabulary->license) === 1) {
     $set["license"] = (string)$vocabulary->license;
   }
-  $reference = plainText($vocabulary->reference);
-  if ($reference != "") {
-    $set["citation"] = $reference;
+  //schema.org only gives citations for creative works, which a set of terms is but a single term isn't
+  $citations = array_values(array_filter(array_map("plainText", referenceList($vocabulary->reference)), "strlen"));
+  if (count($citations) > 0) {
+    $set["citation"] = (count($citations) == 1) ? $citations[0] : $citations;
   }
   if (count($terms) > 0) {
     $set["hasDefinedTerm"] = array_map("schemaOrgTerm", $terms);

@@ -143,6 +143,11 @@ termForm(array("shortname" => "animal_sound", "name" => "Animal sound", "broader
 capture(function() { return(addTerm()); });
 checkSame("saves the parent as the parent's id", termRow("sound")["id"], termRow("bird_song")["parent"]);
 checkSame("saves the reference", "Smith 2020", termRow("bird_song")["reference"]);
+termForm(array("shortname" => "anthropophony", "name" => "Anthropophony", "reference" => " Krause 2015 \r\n\r\nPijanowski 2011<br>".str_repeat("A long reference. ", 40)));
+list($out, $ok) = capture(function() { return(addTerm()); });
+checkSame("saves several references one per line, however they were separated, leaving out blank lines and with no length limit",
+  "Krause 2015\nPijanowski 2011\n".trim(str_repeat("A long reference. ", 40)), $ok ? termRow("anthropophony")["reference"] : null);
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'anthropophony';");
 termForm(array("shortname" => "echo", "name" => "Echo", "broader" => "echo"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("refuses a term as its own broader term", !$ok && strpos($out, "its own parent or broader term") !== FALSE && termRow("echo") == null);
@@ -532,7 +537,10 @@ check("runs the 0.3 step once the duplicate is removed", strpos($out, "updated t
 check("and then the 0.4 step", strpos($out, "updated to version 0.4</p>") !== FALSE);
 check("and the 0.4.1 step", strpos($out, "updated to version 0.4.1</p>") !== FALSE);
 check("and the 0.4.2 step", strpos($out, "updated to version 0.4.2</p>") !== FALSE);
-checkSame("leaving the database at 0.4.2", "0.4.2", (string)getConfig()["version_db"]);
+check("and the 0.4.3 step", strpos($out, "updated to version 0.4.3</p>") !== FALSE);
+checkSame("leaving the database at 0.4.3", "0.4.3", (string)getConfig()["version_db"]);
+$referenceColumn = $db->query("SHOW COLUMNS FROM ".table("terms")." LIKE 'reference';")->fetch_assoc();
+checkSame("with room for several references", "text", strtolower($referenceColumn["Type"]));
 check("email addresses must now be unique", !$db->query("INSERT INTO ".table("users")." (`email`) VALUES ('twice@example.org');"));
 check("creates the login_attempts table", $db->query("SELECT 1 FROM ".table("login_attempts")." LIMIT 1;") !== FALSE);
 $orphan = termRow("orphan");

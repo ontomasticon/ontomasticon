@@ -21,6 +21,7 @@ function readinessIssues($terms, $vocabularies, $config) {
     "vocabulary-name" => t("Controlled vocabularies without a name"),
     "term-name" => t("Terms without a name, so they have no label"),
     "definition" => t("Terms without a definition"),
+    "citations" => t("Terms whose definition cites a reference, such as [2], that the term doesn't have"),
     "language" => t("Terms whose language isn't a valid language tag, so their name and definition have no language in RDF"),
     "shortname" => t("Terms whose short name isn't safe in a URI, so their URI is invalid"),
     "uri-clash" => t("Terms whose URI clashes with another address on the site, so it doesn't reach the term"),
@@ -67,6 +68,11 @@ function readinessIssues($terms, $vocabularies, $config) {
     }
     if (plainText($term->description) == "") {
       $items["definition"][] = $item;
+    }
+    //[1], [2] and so on in a definition cite the term's references in order (see referenceList())
+    if (preg_match_all('/\[([0-9]+)\]/', plainText($term->description), $cited) > 0
+      && max(array_map("intval", $cited[1])) > count(referenceList($term->reference))) {
+      $items["citations"][] = $item;
     }
     if (!validLanguageTag($term->language)) {
       $items["language"][] = $item;
