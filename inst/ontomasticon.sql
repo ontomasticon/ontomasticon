@@ -31,7 +31,7 @@ CREATE TABLE `terms` (
   `parent` int(11) DEFAULT NULL,
   `invalid_reason` varchar(45) DEFAULT NULL,
   `broader` int(11) DEFAULT NULL,
-  `reference` varchar(500) DEFAULT NULL,
+  `reference` text DEFAULT NULL,
   `created` datetime DEFAULT NULL,
   `modified` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -62,8 +62,8 @@ CREATE TABLE `login_attempts` (
   KEY `ip_attempted` (`ip`, `attempted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO config VALUES('version_db', '0.4.2');
-INSERT INTO config VALUES('version', '0.4.2');
+INSERT INTO config VALUES('version_db', '0.4.3');
+INSERT INTO config VALUES('version', '0.4.3');
 INSERT INTO config VALUES('mode', 'production');
 INSERT INTO config VALUES('default_lang', 'en');
 INSERT INTO config VALUES('description', 'Description goes here.');

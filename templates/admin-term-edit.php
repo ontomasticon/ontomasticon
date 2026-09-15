@@ -89,10 +89,9 @@ if (!userAllow("edit-terms")) {
            value="<?php print ($sn["broader"]=="") ? "" : htmlspecialchars($sn["broader"]); ?>"
            placeholder="">
            <br/><br/>
-    <label for="reference"><?php print t("Reference"); ?></label><br/>
-    <input type="text" id="reference" name="reference"
-           value="<?php print ($sn["reference"]=="") ? "" : htmlspecialchars($sn["reference"]); ?>"
-           placeholder="">
+    <label for="reference"><?php print t("References"); ?></label><br/>
+    <small><?php print t("One reference per line. In the definition, [1] is the first reference, [2] the second, and so on."); ?></small><br/>
+    <textarea id="reference" name="reference" rows="3" cols="50"><?php print h($sn["reference"]); ?></textarea>
            <br/><br/>
     <button type="submit" name="submit"><?php print t("Save"); ?></button>
     <button type="submit" name="delete"><?php print t("Delete"); ?></button>

@@ -127,6 +127,18 @@ if (!userAllow("administer")) {
     }
   }
 
+  if (!$failed && version_compare($version_db, "0.4.3", "<")) {
+    //A term's references, one per line (see referenceList()), can be longer than the 500 characters there was room for
+    if (mysqli_query($db, "ALTER TABLE ".table("terms")." MODIFY COLUMN `reference` TEXT NULL;")) {
+      $version_db = setDBVersion("0.4.3");
+      $updated = TRUE;
+      print "<p>".t("Ontomasticon has been updated to version 0.4.3")."</p>";
+    } else {
+      $failed = TRUE;
+      print "<div class='error'><p>".t("Update to version 0.4.3 failed").": ".h($db->error)."</p></div>";
+    }
+  }
+
   //Term languages were widened for language tags such as zh-Hant without a new version, so this runs whenever
   //the column is still narrow, including on databases that were already updated to 0.4
   if (!$failed && termLanguageColumnTooNarrow()) {

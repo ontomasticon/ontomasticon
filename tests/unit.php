@@ -406,6 +406,21 @@ checkSame("and is a top concept of it", $ld["skos:inScheme"], $ld["skos:topConce
 checkSame("a term without a language has a plain label", "acoustic allometry", $ld["skos:prefLabel"]);
 check("an empty description gives no definition", !isset($ld["skos:definition"]) && !isset($ld["rdfs:comment"]));
 checkSame("gives a web address reference as a source", array("@id" => "https://doi.org/10.1000/example"), $ld["dcterms:source"]);
+checkSame("references are one per line, or separated by <br>, without blank lines", array("A", "B", "C"), referenceList(" A \r\n\r\nB<br />C\n"));
+checkSame("and an empty reference field has none", array(), referenceList(null));
+$ld = termJSONLD(testTerm(array("id" => 6, "shortname" => "anthropophony", "name" => "anthropophony", "description" => "Cites [1] to [4].",
+  "reference" => "Krause BL. Voices of the Wild. 2015.\nhttps://doi.org/10.1000/one\nPijanowski BC, et al. Soundscape ecology. 2011.<br>https://doi.org/10.1000/two")));
+checkSame("gives several references as citations and sources, one for each", array(
+  array("Krause BL. Voices of the Wild. 2015.", "Pijanowski BC, et al. Soundscape ecology. 2011."),
+  array(array("@id" => "https://doi.org/10.1000/one"), array("@id" => "https://doi.org/10.1000/two"))
+), array($ld["dcterms:bibliographicCitation"], $ld["dcterms:source"]));
+check("which Turtle gives as values of one property",
+  strpos(turtleOutput($ld), 'dcterms:bibliographicCitation "Krause BL. Voices of the Wild. 2015.", "Pijanowski BC, et al. Soundscape ecology. 2011."') !== FALSE
+  && strpos(turtleOutput($ld), "dcterms:source <https://doi.org/10.1000/one>, <https://doi.org/10.1000/two>") !== FALSE);
+$cited = new Vocabulary("cited");
+$cited->reference = "Ragge and Reynolds 1998<br>Krause 2015";
+checkSame("a vocabulary's references are citations of its set in schema.org", array("Ragge and Reynolds 1998", "Krause 2015"),
+  schemaOrgTermSetJSONLD($cited, array())["citation"]);
 
 section("JSON-LD vocabularies");
 $callType = new Vocabulary("callType");
@@ -612,6 +627,18 @@ checkSame("and each vocabulary to its edit page", array("label" => "callType", "
 checkSame("a site with nothing to fix has no problems", array(), readinessIssues(array($readinessTerms[0]),
   array("callType" => array("shortname" => "callType", "name" => "Type of Call", "prefix" => "calltype")),
   array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "")));
+$citationIssues = array();
+foreach (readinessIssues(array(
+  testTerm(array("id" => 28, "shortname" => "Cited", "name" => "Cited", "description" => "Cites [1] and [2].", "reference" => "One\nTwo")),
+  testTerm(array("id" => 29, "shortname" => "Uncited", "name" => "Uncited", "description" => "Cites [2].", "reference" => "One"))
+), array(), array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "gl")) as $issue) {
+  $citationIssues[$issue["id"]] = array_column($issue["items"], "label");
+}
+checkSame("and terms whose definition cites a reference they don't have", array("citations" => array("Uncited")), $citationIssues);
+
+section("Static files");
+check("the stylesheet's address has the time it last changed", preg_match('#^/css/default\.css\?v=[0-9]+$#D', assetPath("/css/default.css")) === 1);
+checkSame("a file that isn't there has its address alone", "/css/missing.css", assetPath("/css/missing.css"));
 
 section("Term types");
 checkSame("termType() accepts concept, property and class", array("concept", "property", "class"),

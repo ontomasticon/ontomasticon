@@ -163,13 +163,24 @@ function termNode($term) {
   return(jsonLDReference($node, $term->reference));
 }
 
-//A node with its reference added: a web address as the source, anything else as a citation
+//A node with its references added (see referenceList()): web addresses as sources and anything else as citations,
+//each given as a single value when there is only one
 function jsonLDReference($node, $reference) {
-  $reference = plainText($reference);
-  if (preg_match('#^https?://\S+$#i', $reference)) {
-    $node["dcterms:source"] = array("@id" => $reference);
-  } elseif ($reference != "") {
-    $node["dcterms:bibliographicCitation"] = $reference;
+  $sources = array();
+  $citations = array();
+  foreach (referenceList($reference) as $line) {
+    $text = plainText($line);
+    if (preg_match('#^https?://\S+$#iD', $text) === 1) {
+      $sources[] = array("@id" => $text);
+    } elseif ($text != "") {
+      $citations[] = $text;
+    }
+  }
+  if (count($sources) > 0) {
+    $node["dcterms:source"] = (count($sources) == 1) ? $sources[0] : $sources;
+  }
+  if (count($citations) > 0) {
+    $node["dcterms:bibliographicCitation"] = (count($citations) == 1) ? $citations[0] : $citations;
   }
   return($node);
 }
