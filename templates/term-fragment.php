@@ -30,12 +30,22 @@
   <?php
   template("term-fragment-reference.php");
 
-  if (is_array($GLOBALS["ontomasticon"]["term"]["children"]) && count($GLOBALS["ontomasticon"]["term"]["children"]) > 0) {
+  //The parent term is related too: a synonym shows the term it is a synonym of, as that term shows its synonyms
+  $parentTerms = isset($GLOBALS["ontomasticon"]["term"]["parent_term"]) ? $GLOBALS["ontomasticon"]["term"]["parent_term"] : array();
+  if (count($parentTerms) > 0 || (is_array($GLOBALS["ontomasticon"]["term"]["children"]) && count($GLOBALS["ontomasticon"]["term"]["children"]) > 0)) {
   ?>
     <h4><?php print t("Related terms"); ?></h4>
     <table>
     <?php
-    foreach ($GLOBALS["ontomasticon"]["term"]["children"] as $child) {
+    foreach ($parentTerms as $parentTerm) {
+      print "<tr>";
+      print "<td class='invalid_reason'>".(($GLOBALS["ontomasticon"]["term"]["invalid_reason"] == "Synonym") ? h(t("Synonym of")) : "")."</td>";
+      print "<td class='child_term_name'><a href='".h(term2URI($parentTerm))."'>".h($parentTerm["name"])."</a></td>";
+      print "<td class='child_term_language'>".h($parentTerm["language"])."</td>";
+      print "<td class='child_term_editlink'>".termEditLink($parentTerm["shortname"])."</td>";
+      print "</tr>";
+    }
+    foreach ((is_array($GLOBALS["ontomasticon"]["term"]["children"]) ? $GLOBALS["ontomasticon"]["term"]["children"] : array()) as $child) {
       print "<tr>";
       print "<td class='invalid_reason'>".h(t($child["invalid_reason"]))."</td>";
       print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";

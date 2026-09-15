@@ -274,6 +274,9 @@ check("a term with several references lists them, numbered",
 $concept = json_decode(httpRequest("GET", "/api/term/?shortname=acoustic_allometry&format=jsonld")[2], TRUE);
 checkSame("and its JSON-LD gives each of them", array("Krause 2015", array("@id" => "https://doi.org/10.1000/example")),
   is_array($concept) ? array($concept["dcterms:bibliographicCitation"], $concept["dcterms:source"]) : null);
+$db->query("UPDATE ".table("terms")." SET `reference` = 'Krause 2015' WHERE `shortname` = 'acoustic_allometry';");
+list(, , $body) = httpRequest("GET", "/acoustic_allometry");
+check("and a single reference is numbered too", strpos($body, "<p class='term-reference'>Reference: [1] Krause 2015</p>") !== FALSE);
 $db->query("UPDATE ".table("terms")." SET `description` = NULL, `reference` = NULL WHERE `shortname` = 'acoustic_allometry';");
 list(, , $body) = httpRequest("GET", "/2");
 check("an opaque term's page is at its id", strpos($body, 'id="2"') !== FALSE && strpos($body, "<title>Opaque term – Site name.</title>") !== FALSE);
@@ -348,6 +351,10 @@ checkSame("with its synonyms' names as other names", array(array("@value" => "Al
   isset($data["alternateName"]) ? $data["alternateName"] : null);
 checkSame("in the site's set of terms", array("@type" => "DefinedTermSet", "@id" => "https://glossary.example.org/", "name" => array("@value" => "Site name.", "@language" => "en"), "url" => "https://glossary.example.org/"),
   isset($data["inDefinedTermSet"]) ? $data["inDefinedTermSet"] : null);
+check("the term's page lists its synonym", strpos($body, "<td class='invalid_reason'>Synonym</td><td class='child_term_name'><a href='https://glossary.example.org/allometry'>Allometry</a></td>") !== FALSE);
+list(, , $body) = httpRequest("GET", "/allometry");
+check("and the synonym's page links back to the term it is a synonym of",
+  strpos($body, "<td class='invalid_reason'>Synonym of</td><td class='child_term_name'><a href='https://glossary.example.org/acoustic_allometry'>Acoustic allometry</a></td>") !== FALSE);
 $db->query("DELETE FROM ".table("terms")." WHERE `shortname` = 'allometry';");
 $data = structuredData(httpRequest("GET", "/")[2]);
 $ids = isset($data["hasDefinedTerm"]) ? array_column($data["hasDefinedTerm"], "@id") : array();
