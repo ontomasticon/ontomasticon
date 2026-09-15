@@ -21,6 +21,9 @@ class Term {
   public $modified;
   //"concept", "property" or "class" (see termTypes())
   public $type = "concept";
+  //Where a property's values come from: a vocabulary's shortname, or one of termDatatypes(), or NULL
+  public $rangeCV;
+  public $datatype;
 
   //Related terms that have been loaded, by relation name
   private $related = array();
@@ -32,7 +35,7 @@ class Term {
       "id" => "id", "shortname" => "shortname", "name" => "name", "description" => "description",
       "language" => "language", "opaque" => "opaque", "cv" => "cv", "parent" => "parentID",
       "broader" => "broaderID", "invalid_reason" => "invalidReason", "reference" => "reference",
-      "created" => "created", "modified" => "modified"
+      "created" => "created", "modified" => "modified", "range_cv" => "rangeCV", "datatype" => "datatype"
     );
     $term = new Term();
     foreach ($columns as $column => $property) {
