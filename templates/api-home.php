@@ -26,6 +26,19 @@
   </div>
 
   <div class="feature">
+    <h3>Search endpoint</h3>
+
+    <h4>/api/search/?q=</h4>
+    <p>
+        Returns a JSON array of up to ten terms whose name or short name contains the text, those that start
+        with it first, as the site's search box suggests them. Each has its <code>name</code>,
+        <code>shortname</code> and <code>uri</code>, and the name of its <code>vocabulary</code> (or null).
+        A synonym also has <code>synonym_of</code>, the name of the term it is a synonym of, and the
+        <code>uri</code> and <code>vocabulary</code> of that term.
+    </p>
+  </div>
+
+  <div class="feature">
     <h3>Vocabulary endpoints</h3>
     <p>These endpoints return JSON-LD, or Turtle when <code>format=ttl</code> is added.</p>
 

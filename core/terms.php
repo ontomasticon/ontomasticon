@@ -49,6 +49,93 @@ function getTerms($cv=null) {
   return(withTermRelations($ret));
 }
 
+//The most characters of a search that are used
+define("SEARCH_QUERY_LENGTH", 100);
+
+//The text searched for with ?q=, without spaces around it and cut to SEARCH_QUERY_LENGTH characters, or "" if there is none
+function searchQuery() {
+  if (!isset($_GET["q"]) || !is_string($_GET["q"])) {
+    return("");
+  }
+  preg_match('/^.{0,'.SEARCH_QUERY_LENGTH.'}/us', validUTF8(trim($_GET["q"])), $matches);
+  return(trim($matches[0]));
+}
+
+//A pattern for LIKE ... ESCAPE '|' matching text that contains $text, or that starts with it if $start is TRUE.
+//LIKE's wildcards in $text only match themselves.
+function likePattern($text, $start = FALSE) {
+  $escaped = str_replace(array("|", "%", "_"), array("||", "|%", "|_"), $text);
+  return((($start) ? "" : "%").$escaped."%");
+}
+
+//Terms whose name or short name contains $query, to suggest as a visitor types a search: at most $limit, those whose
+//name or short name starts with it first, then in order of name. A synonym leads to the term it is a synonym of, and
+//only one suggestion leads to each term. Each is array("name", "shortname", "uri" (of the term it leads to),
+//"vocabulary" (the name of that term's vocabulary, or NULL), "synonym_of" (the name of that term for a synonym, or NULL)).
+function termSuggestions($query, $limit = 10) {
+  if ($query === "") {
+    return(array());
+  }
+  $contains = likePattern($query);
+  $starts = likePattern($query, TRUE);
+  $sql  = "SELECT * FROM ".table("terms")." WHERE (`invalid_reason` IS NULL OR `invalid_reason` = 'Synonym') ";
+  $sql .= "AND (`name` LIKE ? ESCAPE '|' OR `shortname` LIKE ? ESCAPE '|') ";
+  //Synonyms of terms already suggested are left out, so there are spare rows to fill the list
+  $sql .= "ORDER BY (`name` LIKE ? ESCAPE '|' OR `shortname` LIKE ? ESCAPE '|') DESC, `name`, `shortname` LIMIT ".((int)$limit * 2).";";
+  $result = dbQuery($sql, array($contains, $contains, $starts, $starts));
+  $rows = ($result) ? $result->fetch_all(MYSQLI_ASSOC) : array();
+
+  $parentIds = array();
+  foreach ($rows as $row) {
+    if ($row["invalid_reason"] == "Synonym" && $row["parent"] != "") {
+      $parentIds[] = $row["parent"];
+    }
+  }
+  $parents = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s) AND `invalid_reason` IS NULL;", array_values(array_unique($parentIds)));
+  $CVs = isset($GLOBALS["ontomasticon"]["CVs"]) ? $GLOBALS["ontomasticon"]["CVs"] : array();
+
+  $suggestions = array();
+  foreach ($rows as $row) {
+    $target = $row;
+    $synonymOf = null;
+    if ($row["invalid_reason"] == "Synonym") {
+      if (!isset($parents[$row["parent"]])) {
+        continue;
+      }
+      $target = $parents[$row["parent"]][0];
+      $synonymOf = glossaryLabel($target);
+    }
+    if (isset($suggestions[$target["id"]]) || count($suggestions) >= $limit) {
+      continue;
+    }
+    $suggestions[$target["id"]] = array(
+      "name" => glossaryLabel($row),
+      "shortname" => $row["shortname"],
+      "uri" => term2URI($target),
+      "vocabulary" => ($target["cv"] != "" && isset($CVs[$target["cv"]])) ? $CVs[$target["cv"]]["name"] : null,
+      "synonym_of" => $synonymOf
+    );
+  }
+  return(array_values($suggestions));
+}
+
+//Valid terms for the page of results of a search, with their related terms (see withTermRelations()): those whose name,
+//short name or definition contains $query, or that have a synonym whose name or short name does. Terms whose name
+//starts with it come first, then in order of name.
+function searchTerms($query) {
+  if ($query === "") {
+    return(array());
+  }
+  $contains = likePattern($query);
+  $sql  = "SELECT * FROM ".table("terms")." WHERE `invalid_reason` IS NULL ";
+  $sql .= "AND (`name` LIKE ? ESCAPE '|' OR `shortname` LIKE ? ESCAPE '|' OR `description` LIKE ? ESCAPE '|' ";
+  $sql .= "OR `id` IN (SELECT `parent` FROM ".table("terms")." WHERE `invalid_reason` = 'Synonym' AND (`name` LIKE ? ESCAPE '|' OR `shortname` LIKE ? ESCAPE '|'))) ";
+  $sql .= "ORDER BY `name` LIKE ? ESCAPE '|' DESC, `name`, `shortname`;";
+  $result = dbQuery($sql, array($contains, $contains, $contains, $contains, $contains, likePattern($query, TRUE)));
+  $rows = ($result) ? $result->fetch_all(MYSQLI_ASSOC) : array();
+  return(withTermRelations($rows));
+}
+
 //A term with its related terms (see withTermRelations()), for the term's own page, or NULL if no term has this id
 function getTermForPage($id) {
   $result = dbQuery("SELECT * FROM ".table("terms")." WHERE `id` = ?;", array($id));

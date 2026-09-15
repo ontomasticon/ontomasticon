@@ -177,6 +177,29 @@ $term = getTerm("animal_sound");
 checkSame("getTerm() gives the broader term's short name", "sound", $term["broader"]);
 checkSame("getTermByID() finds the same term", "animal_sound", getTermByID($term["id"])["shortname"]);
 
+section("Searching terms");
+termForm(array("shortname" => "stridulation", "name" => "Stridulation", "description" => "Rubbing body parts together to make a sound."));
+capture(function() { return(addTerm()); });
+termForm(array("shortname" => "wing_stridulation", "name" => "Wing stridulation", "description" => "Rubbing the wings together."));
+capture(function() { return(addTerm()); });
+termForm(array("shortname" => "stridulatory_sound", "name" => "Stridulatory sound", "invalid" => "Synonym", "parent" => "stridulation"));
+capture(function() { return(addTerm()); });
+termForm(array("shortname" => "full_duty_cycle", "name" => "100% duty cycle"));
+capture(function() { return(addTerm()); });
+checkSame("suggests terms whose name contains the search, those starting with it first, with one suggestion for each term",
+  array("stridulation", "wing_stridulation"), array_column(termSuggestions("stridul"), "shortname"));
+checkSame("ignoring case", array("wing_stridulation"), array_column(termSuggestions("WING"), "shortname"));
+checkSame("a synonym leads to the term it is a synonym of", array(array("name" => "Stridulatory sound", "shortname" => "stridulatory_sound",
+  "uri" => "https://glossary.example.org/stridulation", "vocabulary" => null, "synonym_of" => "Stridulation")), termSuggestions("stridulatory"));
+checkSame("suggests at most as many as asked for", 1, count(termSuggestions("stridul", 1)));
+checkSame("a % in the search only matches itself", array("full_duty_cycle"), array_column(termSuggestions("%"), "shortname"));
+checkSame("nothing is suggested for an empty search", array(), termSuggestions(""));
+checkSame("the results page lists valid terms whose definition contains the search", array("stridulation", "wing_stridulation"),
+  array_column(searchTerms("rubbing"), "shortname"));
+checkSame("and terms with a synonym that matches", array("stridulation"), array_column(searchTerms("stridulatory"), "shortname"));
+check("with their related terms", isset(searchTerms("wing")[0]["narrower"]));
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` IN ('stridulatory_sound', 'stridulation', 'wing_stridulation', 'full_duty_cycle');");
+
 section("Term objects");
 $shortnames = function($terms) {
   return(array_map(function($term) { return($term->shortname); }, $terms));
