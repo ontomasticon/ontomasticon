@@ -107,7 +107,7 @@ class Term {
   //Terms matching a condition on the terms table, with ? placeholders filled from $params
   private static function loadAll($where, $params) {
     $terms = array();
-    $result = dbQuery("SELECT * FROM `terms` WHERE ".$where." ORDER BY `shortname`;", $params);
+    $result = dbQuery("SELECT * FROM ".table("terms")." WHERE ".$where." ORDER BY `shortname`;", $params);
     if ($result) {
       foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
         $terms[] = Term::fromRow($row);
@@ -237,7 +237,7 @@ class Vocabulary {
 
   //The vocabulary with a shortname, or NULL if there is no match
   public static function find($shortname) {
-    $result = dbQuery("SELECT * FROM `cv` WHERE `shortname` = ?;", array($shortname));
+    $result = dbQuery("SELECT * FROM ".table("cv")." WHERE `shortname` = ?;", array($shortname));
     $row = ($result) ? $result->fetch_assoc() : null;
     if ($row == null) {
       return(null);

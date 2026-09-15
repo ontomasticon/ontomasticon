@@ -46,7 +46,7 @@ function saveConfig() {
   $ok = TRUE;
   foreach ($vals as $key => $val) {
     //A setting added by a later version may not have a row yet
-    $ok = dbQuery("INSERT INTO `config` (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?;", array($key, $val, $val)) && $ok;
+    $ok = dbQuery("INSERT INTO ".table("config")." (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?;", array($key, $val, $val)) && $ok;
   }
   reportSaved($ok);
   $GLOBALS["ontomasticon"]["config"] = getConfig($db);
@@ -61,7 +61,7 @@ function saveConfig() {
 function getConfig() {
   global $db;
   $config = array();
-  $sql = "SELECT * FROM `config`;";
+  $sql = "SELECT * FROM ".table("config").";";
   $result = $db->query($sql);
   if ($result) {
     while ($row = $result->fetch_assoc()) {
@@ -105,7 +105,7 @@ function checkConfig($config) {
  * @return String $v, for tracking progress through the update steps
  */
 function setDBVersion($v) {
-  dbQuery("UPDATE `config` SET `value` = ? WHERE `key` = 'version_db';", array($v));
-  dbQuery("UPDATE `config` SET `value` = ? WHERE `key` = 'version';", array($v));
+  dbQuery("UPDATE ".table("config")." SET `value` = ? WHERE `key` = 'version_db';", array($v));
+  dbQuery("UPDATE ".table("config")." SET `value` = ? WHERE `key` = 'version';", array($v));
   return($v);
 }
