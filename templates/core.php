@@ -2,6 +2,7 @@
 <html lang="<?php print h(currentLanguage()); ?>">
 <head>
 <meta charset = "UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?php print h(tu("site_name")); ?></title>
 <meta name="Generator" content="Ontomasticon (https://ontomasticon.github.io/)"/>
 <meta name="author" content="<?php print h($GLOBALS["ontomasticon"]["config"]["author"]); ?>">
