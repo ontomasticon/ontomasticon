@@ -14,6 +14,7 @@ function lang_jibberish() {
     "Name" => "JabberJabber",
     "Related terms" => "Mimicry",
     "Synonym" => "Doppelganger",
+    "Synonym of" => "Doppelganger of",
     "Broader term" => "Mudflats",
     "Narrower terms" => "Mudlarks",
     "Powered by" => "Flown by dragon called",

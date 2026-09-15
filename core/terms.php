@@ -144,25 +144,33 @@ function getTermForPage($id) {
 }
 
 //Rows of the terms table, each with the terms related to it for showing on a page: "children" (terms it is the parent
-//of), "narrower" (valid terms it is the broader term of) and "broader" (its broader term as a list, if it is valid).
+//of), "parent_term" (its parent term as a list, so a synonym shows the term it is a synonym of), "narrower" (valid terms
+//it is the broader term of) and "broader" (its broader term as a list, if it is valid).
 //The related terms of the whole list are fetched at once, rather than for each term.
 function withTermRelations($ret) {
   $ids = array_column($ret, "id");
   $broaderIds = array();
+  $parentIds = array();
   foreach ($ret as $row) {
     if ($row["broader"] != "") {
       $broaderIds[] = $row["broader"];
     }
+    if ($row["parent"] != "") {
+      $parentIds[] = $row["parent"];
+    }
   }
   $broaderIds = array_values(array_unique($broaderIds));
+  $parentIds = array_values(array_unique($parentIds));
 
   $children = termsGroupedBy("parent", "SELECT * FROM ".table("terms")." WHERE `parent` IN (%s) ORDER BY `invalid_reason`;", $ids);
+  $parents  = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s);", $parentIds);
   $narrower = termsGroupedBy("broader", "SELECT * FROM ".table("terms")." WHERE `broader` IN (%s) AND `invalid_reason` IS NULL ORDER BY `shortname`;", $ids);
   $broader  = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s) AND `invalid_reason` IS NULL;", $broaderIds);
 
   $out = array();
   foreach ($ret as $row) {
     $row["children"] = isset($children[$row["id"]]) ? $children[$row["id"]] : array();
+    $row["parent_term"] = ($row["parent"] != "" && isset($parents[$row["parent"]])) ? $parents[$row["parent"]] : array();
     $row["narrower"] = isset($narrower[$row["id"]]) ? $narrower[$row["id"]] : array();
     if ($row["broader"] != "") {
       $row["broader"] = isset($broader[$row["broader"]]) ? $broader[$row["broader"]] : array();

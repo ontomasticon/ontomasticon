@@ -178,6 +178,8 @@ checkSame("includes child terms", array("bird_song"), array_column($terms["sound
 checkSame("includes narrower terms", array("animal_sound"), array_column($terms["sound"]["narrower"], "shortname"));
 checkSame("includes the broader term", array("sound"), array_column($terms["animal_sound"]["broader"], "shortname"));
 checkSame("terms without children have none", array(), $terms["bird_song"]["children"]);
+checkSame("includes the parent term", array("sound"), array_column($terms["bird_song"]["parent_term"], "shortname"));
+checkSame("terms without a parent have none", array(), $terms["sound"]["parent_term"]);
 $term = getTerm("animal_sound");
 checkSame("getTerm() gives the broader term's short name", "sound", $term["broader"]);
 checkSame("getTermByID() finds the same term", "animal_sound", getTermByID($term["id"])["shortname"]);
@@ -203,6 +205,8 @@ checkSame("the results page lists valid terms whose definition contains the sear
   array_column(searchTerms("rubbing"), "shortname"));
 checkSame("and terms with a synonym that matches", array("stridulation"), array_column(searchTerms("stridulatory"), "shortname"));
 check("with their related terms", isset(searchTerms("wing")[0]["narrower"]));
+checkSame("a synonym's page has the term it is a synonym of", array("stridulation"),
+  array_column(getTermForPage(termRow("stridulatory_sound")["id"])["parent_term"], "shortname"));
 dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` IN ('stridulatory_sound', 'stridulation', 'wing_stridulation', 'full_duty_cycle');");
 
 section("Term objects");
