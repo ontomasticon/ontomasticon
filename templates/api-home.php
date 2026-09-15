@@ -13,10 +13,10 @@
     <p>These endpoints return a term object.</p>
 
     <h4>/api/term/?term=</h4>
-    <p>Given a term URL returns a JSON term object. The term must be HTML encoded.</p>
+    <p>Given a term's URI returns a JSON term object. The URI must be URL-encoded.</p>
 
     <h4>/api/term/?shortname=</h4>
-    <p>Given a term name returns a JSON term object.</p>
+    <p>Given a term's short name returns a JSON term object.</p>
 
     <h4>&amp;format=jsonld or &amp;format=ttl</h4>
     <p>
@@ -39,8 +39,8 @@
         Returns a JSON array of up to ten terms whose name, short name or acronym contains the text, those that start
         with it first, as the site's search box suggests them. Each has its <code>name</code>,
         <code>shortname</code>, <code>acronym</code> (or null) and <code>uri</code>, and the name of its <code>vocabulary</code> (or null).
-        A synonym also has <code>synonym_of</code>, the name of the term it is a synonym of, and the
-        <code>uri</code> and <code>vocabulary</code> of that term.
+        Each also has <code>synonym_of</code>: for a synonym, the name of the term it is a synonym of, whose
+        <code>uri</code> and <code>vocabulary</code> are given; otherwise null.
     </p>
   </div>
 
