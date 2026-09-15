@@ -22,7 +22,7 @@ CREATE TABLE `terms` (
   `shortname` varchar(45) DEFAULT NULL,
   `name` varchar(200) DEFAULT NULL,
   `description` longtext DEFAULT NULL,
-  `language` varchar(5) DEFAULT NULL,
+  `language` varchar(35) DEFAULT NULL,
   `opaque` tinyint(4) DEFAULT NULL,
   `cv` varchar(30) DEFAULT NULL,
   `parent` int(11) DEFAULT NULL,

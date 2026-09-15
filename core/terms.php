@@ -123,19 +123,94 @@ function termShortname($id) {
   return(null);
 }
 
-//Look up the ids of the parent and broader terms named in a term form.
-//Prints an error and returns NULL if a named term doesn't exist.
-function termRelations() {
+//Look up the ids of the parent and broader terms named in a term form, for the term with this shortname and, once it
+//has been saved, this id. Prints an error and returns NULL if a named term doesn't exist, is the term itself, or would
+//make a loop of parent or broader terms, which would break the hierarchy in RDF.
+function termRelations($shortname, $id = null) {
   $ids = array();
   foreach (array("parent", "broader") as $field) {
-    $shortname = trim($_POST[$field]);
-    $ids[$field] = ($shortname == "") ? null : termID($shortname);
-    if ($shortname != "" && $ids[$field] === null) {
-      printError(t("Not saved. There is no term with the short name")." ".$shortname);
+    $related = trim($_POST[$field]);
+    $ids[$field] = ($related == "") ? null : termID($related);
+    if ($related == "") {
+      continue;
+    }
+    if (strcasecmp($related, $shortname) == 0 || ($id !== null && $ids[$field] == $id)) {
+      printError(t("Not saved. A term can't be its own parent or broader term."));
+      return(null);
+    }
+    if ($ids[$field] === null) {
+      printError(t("Not saved. There is no term with the short name")." ".$related);
+      return(null);
+    }
+    if ($id !== null && termLinksReach($field, $ids[$field], $id)) {
+      printError(t("Not saved. Following the parent or broader terms up from this term leads back to the term being saved, which would make a loop:")." ".$related);
       return(null);
     }
   }
   return($ids);
+}
+
+//Whether following parent (or broader) links up from the term with id $fromID reaches the term with id $targetID.
+//Stops at a loop saved before loops were refused, so it always ends.
+function termLinksReach($column, $fromID, $targetID) {
+  $sql = ($column == "parent") ? "SELECT `parent` AS `next` FROM `terms` WHERE `id` = ?;" : "SELECT `broader` AS `next` FROM `terms` WHERE `id` = ?;";
+  $seen = array();
+  $id = $fromID;
+  while ($id !== null && !isset($seen[$id])) {
+    if ($id == $targetID) {
+      return(TRUE);
+    }
+    $seen[$id] = TRUE;
+    $result = dbQuery($sql, array($id));
+    $row = ($result) ? $result->fetch_assoc() : null;
+    $id = ($row == null) ? null : $row["next"];
+  }
+  return(FALSE);
+}
+
+//The most characters a term's language can have: the size of the database column, and the length RFC 5646 asks
+//systems that store language tags to allow
+define("TERM_LANGUAGE_LENGTH", 35);
+
+//The error explaining why a term can't have a language, or NULL if it can. A term can have no language, but a
+//language it has must be a language tag that RDF can use, and short enough for the database.
+function termLanguageError($language) {
+  if ((string)$language === "") {
+    return(null);
+  }
+  if (!validLanguageTag($language)) {
+    return(t("Not saved. The language must be a language tag such as en, pt-BR or zh-Hant, with hyphens rather than underscores."));
+  }
+  if (strlen($language) > TERM_LANGUAGE_LENGTH) {
+    return(t("Not saved. A language tag can be at most 35 characters long."));
+  }
+  return(null);
+}
+
+//Whether the terms table's language column is narrower than TERM_LANGUAGE_LENGTH, as it was before the database
+//update that widens it
+function termLanguageColumnTooNarrow() {
+  global $db;
+  $result = $db->query("SHOW COLUMNS FROM `terms` LIKE 'language';");
+  $row = ($result) ? $result->fetch_assoc() : null;
+  if ($row == null || preg_match('/\(([0-9]+)\)/', $row["Type"], $matches) !== 1) {
+    return(FALSE);
+  }
+  return((int)$matches[1] < TERM_LANGUAGE_LENGTH);
+}
+
+//Why the term with an id can't be deleted, or NULL if it can. Synonyms are only shown with the term they are a
+//synonym of, so deleting that term would leave them out of sight. They have to be given another parent or deleted first.
+function termDeleteError($id) {
+  if ($id === null) {
+    return(null);
+  }
+  $result = dbQuery("SELECT `shortname` FROM `terms` WHERE `parent` = ? AND `invalid_reason` = 'Synonym' ORDER BY `shortname`;", array($id));
+  $synonyms = ($result) ? array_column($result->fetch_all(MYSQLI_ASSOC), "shortname") : array();
+  if (count($synonyms) == 0) {
+    return(null);
+  }
+  return(t("Not deleted. These terms are synonyms of this term. Change their parent, or delete them, first:")." ".implode(", ", $synonyms));
 }
 
 //Whether a term outside a vocabulary with this shortname would have a URI that never reaches the term's page:
@@ -169,21 +244,25 @@ function termShortnameClash($shortname, $cv, $opaque) {
 }
 
 function editTerm() {
-  $relations = termRelations();
+  $shortname = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
+  $current = getTerm($shortname);
+  $relations = termRelations($shortname, ($current == null) ? null : $current["id"]);
   if ($relations === null) {
     return(FALSE);
   }
-  $shortname = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
   $name = trim($_POST['name']);
   $description = trim($_POST['description']);
   $language = trim($_POST['language']);
+  if (termLanguageError($language) !== null) {
+    printError(termLanguageError($language));
+    return(FALSE);
+  }
   $opaque = (isset($_POST["opaque"]) ? 1 : 0);
   $cv = ((!isset($_POST["cv"]) || $_POST["cv"]=="none") ? "" : trim($_POST['cv']));
   $invalid = ((!isset($_POST["invalid"]) || $_POST["invalid"]=="none") ? "" : trim($_POST['invalid']));
   $reference = trim($_POST['reference']);
   //Moving a term out of a vocabulary, or making it not opaque, can give it a URI it can't use. A term saved with
   //such a URI before this was checked can still be edited, as long as the edit doesn't add a different problem.
-  $current = getTerm($shortname);
   $clash = termShortnameClash($shortname, $cv, $opaque);
   if ($current != null && $clash !== null && $clash !== termShortnameClash($shortname, $current["cv"], $current["opaque"])) {
     printError($clash);
@@ -221,13 +300,17 @@ function addTerm() {
     printError(t("Not saved. There is already a term with the short name")." ".$shortname);
     return(FALSE);
   }
-  $relations = termRelations();
+  $relations = termRelations($shortname);
   if ($relations === null) {
     return(FALSE);
   }
   $name = trim($_POST['name']);
   $description = trim($_POST['description']);
   $language = trim($_POST['language']);
+  if (termLanguageError($language) !== null) {
+    printError(termLanguageError($language));
+    return(FALSE);
+  }
   $opaque = (isset($_POST["opaque"]) ? 1 : 0);
   $cv = ((!isset($_POST["cv"]) || $_POST["cv"]=="none") ? "" : trim($_POST['cv']));
   $invalid = ((!isset($_POST["invalid"]) || $_POST["invalid"]=="none") ? "" : trim($_POST['invalid']));
@@ -261,7 +344,12 @@ function deleteTerm() {
     printError(t("No matching term found"));
     return(FALSE);
   }
-  //Unlink terms that refer to this one, so they don't point at a missing term
+  $error = termDeleteError($id);
+  if ($error !== null) {
+    printError($error);
+    return(FALSE);
+  }
+  //Unlink the related and narrower terms that refer to this one, so they don't point at a missing term
   $db->begin_transaction();
   $ok = dbQuery("UPDATE `terms` SET `parent` = NULL WHERE `parent` = ?;", array($id))
     && dbQuery("UPDATE `terms` SET `broader` = NULL WHERE `broader` = ?;", array($id))

@@ -92,6 +92,18 @@ if (!userAllow("administer")) {
     }
   }
 
+  //Term languages were widened for language tags such as zh-Hant without a new version, so this runs whenever
+  //the column is still narrow, including on databases that were already updated to 0.4
+  if (!$failed && termLanguageColumnTooNarrow()) {
+    if (mysqli_query($db, "ALTER TABLE `terms` MODIFY COLUMN `language` VARCHAR(".TERM_LANGUAGE_LENGTH.") DEFAULT NULL;")) {
+      $updated = TRUE;
+      print "<p>".t("Term languages can now be up to 35 characters long.")."</p>";
+    } else {
+      $failed = TRUE;
+      print "<div class='error'><p>".t("Updating term languages failed").": ".h($db->error)."</p></div>";
+    }
+  }
+
   if ($updated) {
     $GLOBALS["ontomasticon"]["config"] = getConfig($db);
   } elseif (!$failed) {

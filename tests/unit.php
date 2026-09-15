@@ -209,6 +209,15 @@ checkSame("separates paragraphs with a space", "First. Second.", plainText("<p>F
 checkSame("keeps escaped angle brackets as text", "a <b> tag", plainText("a &lt;b&gt; tag"));
 checkSame("NULL gives an empty string", "", plainText(null));
 
+section("Term languages");
+checkSame("termLanguageError() accepts language tags with a script or region", array(null, null, null),
+  array(termLanguageError("en"), termLanguageError("zh-Hant"), termLanguageError("es-419")));
+checkSame("and no language", null, termLanguageError(""));
+check("but not en_GB, or a tag with a trailing newline", termLanguageError("en_GB") !== null && termLanguageError("en\n") !== null);
+checkSame("accepts a tag of 35 characters", null, termLanguageError("en-abcdefgh-abcdefgh-abcdefgh-abcde"));
+check("but not a longer one, which the database can't hold", termLanguageError("en-abcdefgh-abcdefgh-abcdefgh-abcdef") !== null);
+checkSame("JSON-LD doesn't tag text with a language that has a trailing newline", "Canto", jsonLDText("Canto", "en\n"));
+
 section("JSON output");
 if (!function_exists("json_encode")) {
   print "  JSON tests skipped: this PHP doesn't have the json extension.\n";
