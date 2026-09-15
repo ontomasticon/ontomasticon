@@ -15,9 +15,9 @@ function getTermByID($id) {
 //Load a term by its shortname or id, with its parent and broader terms given as shortnames
 function loadTerm($column, $value) {
   if ($column == "id") {
-    $sql = "SELECT * FROM `terms` WHERE `id` = ?;";
+    $sql = "SELECT * FROM ".table("terms")." WHERE `id` = ?;";
   } else {
-    $sql = "SELECT * FROM `terms` WHERE `shortname` = ?;";
+    $sql = "SELECT * FROM ".table("terms")." WHERE `shortname` = ?;";
   }
   $result = dbQuery($sql, array($value));
   if ($result) {
@@ -34,10 +34,10 @@ function loadTerm($column, $value) {
 
 function getTerms($cv=null) {
   if ($cv != null) {
-    $sql = "SELECT * FROM `terms` WHERE `cv` = ? AND `invalid_reason` IS NULL ORDER BY `shortname`;";
+    $sql = "SELECT * FROM ".table("terms")." WHERE `cv` = ? AND `invalid_reason` IS NULL ORDER BY `shortname`;";
     $result = dbQuery($sql, array($cv));
   }  else {
-    $sql = "SELECT * FROM `terms` WHERE `cv` IS NULL AND `invalid_reason` IS NULL;";
+    $sql = "SELECT * FROM ".table("terms")." WHERE `cv` IS NULL AND `invalid_reason` IS NULL;";
     $result = dbQuery($sql);
   }
 
@@ -57,9 +57,9 @@ function getTerms($cv=null) {
   }
   $broaderIds = array_values(array_unique($broaderIds));
 
-  $children = termsGroupedBy("parent", "SELECT * FROM `terms` WHERE `parent` IN (%s) ORDER BY `invalid_reason`;", $ids);
-  $narrower = termsGroupedBy("broader", "SELECT * FROM `terms` WHERE `broader` IN (%s) AND `invalid_reason` IS NULL ORDER BY `shortname`;", $ids);
-  $broader  = termsGroupedBy("id", "SELECT * FROM `terms` WHERE `id` IN (%s) AND `invalid_reason` IS NULL;", $broaderIds);
+  $children = termsGroupedBy("parent", "SELECT * FROM ".table("terms")." WHERE `parent` IN (%s) ORDER BY `invalid_reason`;", $ids);
+  $narrower = termsGroupedBy("broader", "SELECT * FROM ".table("terms")." WHERE `broader` IN (%s) AND `invalid_reason` IS NULL ORDER BY `shortname`;", $ids);
+  $broader  = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s) AND `invalid_reason` IS NULL;", $broaderIds);
 
   $out = array();
   foreach ($ret as $row) {
@@ -104,7 +104,7 @@ function termAnchor($term) {
 
 //Look up the id of a term from its shortname, or NULL if there is no match
 function termID($shortname) {
-  $result = dbQuery("SELECT `id` FROM `terms` WHERE `shortname` = ?;", array($shortname));
+  $result = dbQuery("SELECT `id` FROM ".table("terms")." WHERE `shortname` = ?;", array($shortname));
   if ($result && $row = $result->fetch_assoc()) {
     return($row["id"]);
   }
@@ -116,7 +116,7 @@ function termShortname($id) {
   if ($id === null || $id === "") {
     return(null);
   }
-  $result = dbQuery("SELECT `shortname` FROM `terms` WHERE `id` = ?;", array($id));
+  $result = dbQuery("SELECT `shortname` FROM ".table("terms")." WHERE `id` = ?;", array($id));
   if ($result && $row = $result->fetch_assoc()) {
     return($row["shortname"]);
   }
@@ -153,7 +153,7 @@ function termRelations($shortname, $id = null) {
 //Whether following parent (or broader) links up from the term with id $fromID reaches the term with id $targetID.
 //Stops at a loop saved before loops were refused, so it always ends.
 function termLinksReach($column, $fromID, $targetID) {
-  $sql = ($column == "parent") ? "SELECT `parent` AS `next` FROM `terms` WHERE `id` = ?;" : "SELECT `broader` AS `next` FROM `terms` WHERE `id` = ?;";
+  $sql = "SELECT ".(($column == "parent") ? "`parent`" : "`broader`")." AS `next` FROM ".table("terms")." WHERE `id` = ?;";
   $seen = array();
   $id = $fromID;
   while ($id !== null && !isset($seen[$id])) {
@@ -191,7 +191,7 @@ function termLanguageError($language) {
 //update that widens it
 function termLanguageColumnTooNarrow() {
   global $db;
-  $result = $db->query("SHOW COLUMNS FROM `terms` LIKE 'language';");
+  $result = $db->query("SHOW COLUMNS FROM ".table("terms")." LIKE 'language';");
   $row = ($result) ? $result->fetch_assoc() : null;
   if ($row == null || preg_match('/\(([0-9]+)\)/', $row["Type"], $matches) !== 1) {
     return(FALSE);
@@ -205,7 +205,7 @@ function termDeleteError($id) {
   if ($id === null) {
     return(null);
   }
-  $result = dbQuery("SELECT `shortname` FROM `terms` WHERE `parent` = ? AND `invalid_reason` = 'Synonym' ORDER BY `shortname`;", array($id));
+  $result = dbQuery("SELECT `shortname` FROM ".table("terms")." WHERE `parent` = ? AND `invalid_reason` = 'Synonym' ORDER BY `shortname`;", array($id));
   $synonyms = ($result) ? array_column($result->fetch_all(MYSQLI_ASSOC), "shortname") : array();
   if (count($synonyms) == 0) {
     return(null);
@@ -269,7 +269,7 @@ function editTerm() {
     return(FALSE);
   }
 
-  $sql  = "UPDATE `terms` SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, ";
+  $sql  = "UPDATE ".table("terms")." SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, ";
   $sql .= "`invalid_reason` = ?, `cv` = ?, `parent` = ?, `broader` = ?, `reference` = ?, `modified` = UTC_TIMESTAMP() ";
   $sql .= "WHERE `shortname` = ?;";
   return(reportSaved(dbQuery($sql, array(
@@ -321,7 +321,7 @@ function addTerm() {
     return(FALSE);
   }
 
-  $sql  = "INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`, `created`, `modified`) ";
+  $sql  = "INSERT INTO ".table("terms")." (`shortname`, `name`, `description`, `language`, `opaque`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`, `created`, `modified`) ";
   $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP());";
   return(reportSaved(dbQuery($sql, array(
     $shortname,
@@ -351,9 +351,9 @@ function deleteTerm() {
   }
   //Unlink the related and narrower terms that refer to this one, so they don't point at a missing term
   $db->begin_transaction();
-  $ok = dbQuery("UPDATE `terms` SET `parent` = NULL WHERE `parent` = ?;", array($id))
-    && dbQuery("UPDATE `terms` SET `broader` = NULL WHERE `broader` = ?;", array($id))
-    && dbQuery("DELETE FROM `terms` WHERE `id` = ?;", array($id));
+  $ok = dbQuery("UPDATE ".table("terms")." SET `parent` = NULL WHERE `parent` = ?;", array($id))
+    && dbQuery("UPDATE ".table("terms")." SET `broader` = NULL WHERE `broader` = ?;", array($id))
+    && dbQuery("DELETE FROM ".table("terms")." WHERE `id` = ?;", array($id));
   if ($ok) {
     $db->commit();
     return(TRUE);

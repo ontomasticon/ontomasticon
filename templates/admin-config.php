@@ -27,6 +27,11 @@ if (!userAllow("administer")) {
     <input type="text" id="default_lang" name="default_lang"
            value="<?php print h($GLOBALS["ontomasticon"]["config"]["default_lang"]);?>"
            placeholder=""><br/><br/>
+    <label for="languages"><?php print t("Other languages"); ?></label><br/>
+    <small><?php print t("Language codes the site is also offered in, separated by spaces, for example fr pt-BR. Visitors see the site in the one their browser prefers, and can switch between them."); ?></small><br/>
+    <input type="text" id="languages" name="languages"
+           value="<?php print h(configValue("languages"));?>"
+           placeholder=""><br/><br/>
     <label for="base_url"><?php print t("Base URL"); ?></label><br/>
     <small><?php print t("For example glossary.example.org/ or http://glossary.example.org/ (https:// is assumed if left out)"); ?></small><br/>
     <input type="text" id="base_url" name="base_url"

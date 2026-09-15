@@ -54,6 +54,28 @@ function dbQuery($sql, $params = array()) {
   return(($result === FALSE) ? TRUE : $result);
 }
 
+//The prefix on the names of the site's database tables: $table_prefix in settings/db.php, or none.
+//Sites with different prefixes can share a database.
+function tablePrefix() {
+  global $table_prefix;
+  return(isset($table_prefix) ? (string)$table_prefix : "");
+}
+
+//Whether a table prefix is safe to use in SQL: letters A to Z, digits and underscores only
+function validTablePrefix($prefix) {
+  return(preg_match('/^[A-Za-z0-9_]*$/D', $prefix) === 1);
+}
+
+//The name of one of the site's database tables, with the table prefix, quoted for SQL
+function table($name) {
+  return("`".tablePrefix().$name."`");
+}
+
+//SQL from a file, such as the installer's, with the table prefix added to the tables it creates and fills
+function prefixTables($sql) {
+  return(preg_replace('/\b(TABLE(?: IF (?:NOT )?EXISTS)?|INTO)\s+`?(config|cv|terms|users|login_attempts)\b`?/', '$1 '.table('$2'), $sql));
+}
+
 //The error from the last dbQuery() that failed
 function dbError() {
   return(isset($GLOBALS["ontomasticon"]["db_error"]) ? $GLOBALS["ontomasticon"]["db_error"] : "");
@@ -82,11 +104,22 @@ function reportSaved($result, $success = "Saved.") {
 //The site's address, with a trailing slash. The base_url setting may start with
 //http:// or https://; if it has neither, https:// is assumed.
 function siteURL() {
-  $base = $GLOBALS["ontomasticon"]["config"]["base_url"];
+  $base = configValue("base_url");
   if (preg_match('#^https?://#i', $base)) {
     return($base);
   }
   return("https://".$base);
+}
+
+//The path the site is installed at, from the base_url setting, without a trailing slash:
+//"" at the top of a domain, or for example "/glossary" in a subdirectory
+function basePath() {
+  return(rtrim((string)parse_url(siteURL(), PHP_URL_PATH), "/"));
+}
+
+//The address of one of the site's pages or files, from its path within the site (which starts with /)
+function sitePath($path) {
+  return(basePath().$path);
 }
 
 //Short names of terms and vocabularies are used as they are in URIs (the site address followed by
@@ -165,9 +198,10 @@ function requestIsHttps() {
     && strtolower($_SERVER["HTTP_X_FORWARDED_PROTO"]) == "https");
 }
 
-//Hyperlinking function
+//Hyperlinking function. A $url starting with / is a path within the site.
 function l($text, $url) {
   if (substr($url, 0, 1) == '/') {
+    $url = sitePath($url);
     if (isset($_GET["lang"])) {
       $url .= "?lang=".urlencode(detectLanguage());
     }
@@ -209,11 +243,11 @@ function checkUpdate() {
   $h = @fopen($url, "r", FALSE, $context);
 
   //Record the attempt even if it fails, so it isn't retried on every page load
-  $sql = "UPDATE config SET value = UNIX_TIMESTAMP() WHERE `key` = 'update_check';";
+  $sql = "UPDATE ".table("config")." SET value = UNIX_TIMESTAMP() WHERE `key` = 'update_check';";
   $db->query($sql);
 
   if ($h) {
-    $sql = "UPDATE config SET value = 1 WHERE `key` = 'update_check_ok';";
+    $sql = "UPDATE ".table("config")." SET value = 1 WHERE `key` = 'update_check_ok';";
     $db->query($sql);
     while (($line = fgets($h)) !== FALSE) {
       if (strpos($line, '$version') === 0) {
@@ -225,13 +259,13 @@ function checkUpdate() {
         } else {
           $ua = 0;
         }
-        $sql = "UPDATE config SET value = $ua WHERE `key` = 'update_available';";
+        $sql = "UPDATE ".table("config")." SET value = $ua WHERE `key` = 'update_available';";
         $db->query($sql);
       }
     }
     fclose($h);
   } else {
-    $sql = "UPDATE config SET value = 0 WHERE `key` = 'update_check_ok';";
+    $sql = "UPDATE ".table("config")." SET value = 0 WHERE `key` = 'update_check_ok';";
     $db->query($sql);
   }
 }
@@ -276,7 +310,7 @@ function adminSanity() {
     }
   }
 
-  $sql = 'SELECT password FROM users WHERE id = 1;';
+  $sql = "SELECT `password` FROM ".table("users")." WHERE `id` = 1;";
   $rs = $db->query($sql);
   $numrows = mysqli_num_rows($rs);
   if ($numrows == 1) {
