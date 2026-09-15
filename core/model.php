@@ -50,6 +50,11 @@ class Term {
     return(Term::loadOne("`id` = ?", array($id)));
   }
 
+  //Every term, in and outside vocabularies, including deprecated ones
+  public static function all() {
+    return(Term::loadAll("1 = 1", array()));
+  }
+
   //The term a URI identifies, or NULL if it isn't exactly the URI of a term. The URI ends
   //with the term's shortname, or its id if the term is opaque.
   public static function findByURI($uri) {
@@ -102,7 +107,7 @@ class Term {
   //Terms matching a condition on the terms table, with ? placeholders filled from $params
   private static function loadAll($where, $params) {
     $terms = array();
-    $result = dbQuery("SELECT * FROM `terms` WHERE ".$where." ORDER BY `shortname`;", $params);
+    $result = dbQuery("SELECT * FROM ".table("terms")." WHERE ".$where." ORDER BY `shortname`;", $params);
     if ($result) {
       foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
         $terms[] = Term::fromRow($row);
@@ -232,7 +237,7 @@ class Vocabulary {
 
   //The vocabulary with a shortname, or NULL if there is no match
   public static function find($shortname) {
-    $result = dbQuery("SELECT * FROM `cv` WHERE `shortname` = ?;", array($shortname));
+    $result = dbQuery("SELECT * FROM ".table("cv")." WHERE `shortname` = ?;", array($shortname));
     $row = ($result) ? $result->fetch_assoc() : null;
     if ($row == null) {
       return(null);

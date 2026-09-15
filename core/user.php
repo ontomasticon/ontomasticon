@@ -48,7 +48,7 @@ function userAllow($task) {
   $email = $_SESSION["user"];
   //Look each user up once per request, as this is called many times per page
   if (!array_key_exists($email, $users)) {
-    $rs = dbQuery("SELECT `id`, `role` FROM `users` WHERE `email` = ?;", array($email));
+    $rs = dbQuery("SELECT `id`, `role` FROM ".table("users")." WHERE `email` = ?;", array($email));
     $users[$email] = ($rs && mysqli_num_rows($rs) == 1) ? mysqli_fetch_assoc($rs) : null;
   }
   $user = $users[$email];
@@ -98,7 +98,7 @@ function verifyPassword($password, $row) {
     return(FALSE);
   }
   if ($rehash) {
-    dbQuery("UPDATE `users` SET `password` = ? WHERE `id` = ?;", array(password_hash($password, PASSWORD_DEFAULT), $row["id"]));
+    dbQuery("UPDATE ".table("users")." SET `password` = ? WHERE `id` = ?;", array(password_hash($password, PASSWORD_DEFAULT), $row["id"]));
   }
   return(TRUE);
 }
@@ -108,8 +108,8 @@ function verifyPassword($password, $row) {
 function loginLocked($email, $ip) {
   $since = time() - LOGIN_WINDOW;
   //Attempts older than the window are no longer needed
-  dbQuery("DELETE FROM `login_attempts` WHERE `attempted` < ?;", array($since));
-  $rs = dbQuery("SELECT SUM(`email` = ?) AS `email_count`, SUM(`ip` = ?) AS `ip_count` FROM `login_attempts`;", array($email, $ip));
+  dbQuery("DELETE FROM ".table("login_attempts")." WHERE `attempted` < ?;", array($since));
+  $rs = dbQuery("SELECT SUM(`email` = ?) AS `email_count`, SUM(`ip` = ?) AS `ip_count` FROM ".table("login_attempts").";", array($email, $ip));
   $row = ($rs) ? $rs->fetch_assoc() : null;
   if ($row == null) {
     return(FALSE);
@@ -128,10 +128,10 @@ function login(){
     return("Too many failed logins. Please try again later.");
   }
 
-  $rs = dbQuery("SELECT * FROM `users` WHERE email = ?;", array($email));
+  $rs = dbQuery("SELECT * FROM ".table("users")." WHERE email = ?;", array($email));
   $row = ($rs && mysqli_num_rows($rs) == 1) ? mysqli_fetch_assoc($rs) : null;
   if ($row != null && verifyPassword($password, $row)) {
-    dbQuery("DELETE FROM `login_attempts` WHERE `email` = ?;", array($email));
+    dbQuery("DELETE FROM ".table("login_attempts")." WHERE `email` = ?;", array($email));
     //A new session id on login prevents session fixation
     session_regenerate_id(TRUE);
     $_SESSION["user"] = $email;
@@ -145,7 +145,7 @@ function login(){
     //Take as long as checking a password, so response times don't reveal which emails have accounts
     password_hash($password, PASSWORD_DEFAULT);
   }
-  dbQuery("INSERT INTO `login_attempts` (`email`, `ip`, `attempted`) VALUES (?, ?, ?);", array($email, $ip, time()));
+  dbQuery("INSERT INTO ".table("login_attempts")." (`email`, `ip`, `attempted`) VALUES (?, ?, ?);", array($email, $ip, time()));
   //The same message either way, so it doesn't reveal which emails have accounts
   return("Incorrect email address or password");
 }
@@ -159,7 +159,7 @@ function logout(){
 }
 
 function loadUser($email) {
-  $result = dbQuery("SELECT * FROM `users` WHERE `email` = ?;", array($email));
+  $result = dbQuery("SELECT * FROM ".table("users")." WHERE `email` = ?;", array($email));
   if ($result) {
     $ret = $result->fetch_assoc();
     unset($ret["password"]);
@@ -169,12 +169,12 @@ function loadUser($email) {
 }
 
 function getUser($id) {
-  $result = dbQuery("SELECT `id`, `first_name`, `last_name`, `email`, `role` FROM `users` WHERE `id` = ?;", array($id));
+  $result = dbQuery("SELECT `id`, `first_name`, `last_name`, `email`, `role` FROM ".table("users")." WHERE `id` = ?;", array($id));
   return(($result) ? $result->fetch_assoc() : null);
 }
 
 function getUsers() {
-  $result = dbQuery("SELECT `id`, `first_name`, `last_name`, `email`, `role` FROM `users` ORDER BY `id`;");
+  $result = dbQuery("SELECT `id`, `first_name`, `last_name`, `email`, `role` FROM ".table("users")." ORDER BY `id`;");
   return(($result) ? $result->fetch_all(MYSQLI_ASSOC) : array());
 }
 
@@ -199,7 +199,7 @@ function createUser(){
 
   $hashPassword = password_hash($password,PASSWORD_DEFAULT);
 
-  $sql = "INSERT INTO `users` (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?);";
+  $sql = "INSERT INTO ".table("users")." (first_name, last_name, email, password, role) VALUES (?, ?, ?, ?, ?);";
   reportSaved(dbQuery($sql, array($firstName, $surName, $email, $hashPassword, $role)), "User created");
 }
 
@@ -219,7 +219,7 @@ function updateUserDetails($user) {
     return(FALSE);
   }
 
-  $sql = "UPDATE `users` SET `first_name` = ?, `last_name` = ?, `email` = ? WHERE `id` = ?;";
+  $sql = "UPDATE ".table("users")." SET `first_name` = ?, `last_name` = ?, `email` = ? WHERE `id` = ?;";
   $ok = reportSaved(dbQuery($sql, array($first_name, $last_name, $email, $user["id"])));
   //Keep an admin who changes their own email address logged in
   if ($ok && isset($_SESSION["user"]) && $_SESSION["user"] == $user["email"]) {
@@ -235,7 +235,7 @@ function deleteUser($id) {
     printError(t("This user cannot be deleted"));
     return(FALSE);
   }
-  $ok = dbQuery("DELETE FROM `users` WHERE `id` = ?;", array($id));
+  $ok = dbQuery("DELETE FROM ".table("users")." WHERE `id` = ?;", array($id));
   if (!$ok) {
     printError(t("Could not delete").": ".dbError());
   }
@@ -254,7 +254,7 @@ function setUserRole() {
   if ($me["id"] == $_POST['user_id']) {
     return("You cannot change your own role");
   }
-  if (!dbQuery("UPDATE `users` SET `role` = ? WHERE `id` = ?;", array($role, $_POST['user_id']))) {
+  if (!dbQuery("UPDATE ".table("users")." SET `role` = ? WHERE `id` = ?;", array($role, $_POST['user_id']))) {
     return("Could not update role");
   }
   return("Role updated");
@@ -274,7 +274,7 @@ function editUser() {
     if ($o_password == "") {
       $error .= "<p>Current password must be provided.</p>";
     } else {
-      $rs = dbQuery("SELECT * FROM `users` WHERE `email` = ?;", array($_SESSION["user"]));
+      $rs = dbQuery("SELECT * FROM ".table("users")." WHERE `email` = ?;", array($_SESSION["user"]));
       $row = ($rs) ? $rs->fetch_assoc() : null;
       if ($row == null || !verifyPassword($o_password, $row)) {
         $error .= "<p>Current password is incorrect.</p>";
@@ -303,7 +303,7 @@ function editUser() {
       $hashPassword = password_hash($n_password1,PASSWORD_DEFAULT);
     }
 
-    $sql  = "UPDATE `users` SET `first_name` = ?, `last_name` = ?";
+    $sql  = "UPDATE ".table("users")." SET `first_name` = ?, `last_name` = ?";
     $params = array($first_name, $last_name);
     if ($hashPassword != null) {
       $sql .= ", `password` = ?";

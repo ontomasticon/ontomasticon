@@ -4,9 +4,9 @@
     print " ";
     print termEditLink($GLOBALS["ontomasticon"]["term"]["shortname"]);
   ?></h3>
-  <p><?php print term2URI($GLOBALS["ontomasticon"]["term"], TRUE); ?></p>
-  <p><?php print h($GLOBALS["ontomasticon"]["term"]["language"]); ?></p>
-  <p><?php print $GLOBALS["ontomasticon"]["term"]["description"]; ?></p>
+  <p class="term-uri"><?php print term2URI($GLOBALS["ontomasticon"]["term"], TRUE); ?></p>
+  <p class="term-language"><?php print h($GLOBALS["ontomasticon"]["term"]["language"]); ?></p>
+  <p class="term-description"><?php print $GLOBALS["ontomasticon"]["term"]["description"]; ?></p>
   <?php
   template("term-fragment-reference.php");
 

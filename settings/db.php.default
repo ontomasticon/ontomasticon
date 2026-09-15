@@ -6,6 +6,11 @@
 
 $db = new mysqli("localhost", "user", "password", "database");
 
+// To keep more than one Ontomasticon site in the same database, give each site's tables a
+// different prefix, using only letters A to Z, digits and underscores. Set it before running
+// the installer: changing it later points the site at a different set of tables.
+// $table_prefix = "glossary_";
+
 // If the site is behind a CDN or reverse proxy (e.g. Cloudflare), list the proxy's
 // addresses as single IPs or CIDR ranges. Visitors' real IP addresses (used to limit
 // failed logins) and whether they used HTTPS are then read from the headers the proxy

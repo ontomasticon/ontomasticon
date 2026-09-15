@@ -10,26 +10,34 @@ if ($db->connect_error) {
 }
 $db->set_charset("utf8mb4");
 $_SERVER["REMOTE_ADDR"] = "198.51.100.20";
+//Set TEST_TABLE_PREFIX to run the tests with prefixed table names, as $table_prefix in settings/db.php does
+$table_prefix = (string)getenv("TEST_TABLE_PREFIX");
 
-//Drop every table, then run an SQL file the way the installer does
+//Drop every table, then set up from an SQL file
 function resetDatabase($sqlFile) {
   global $db;
   $result = $db->query("SHOW TABLES;");
   foreach ($result->fetch_all() as $table) {
     $db->query("DROP TABLE `".$table[0]."`;");
   }
+  runSQLFile($sqlFile);
+}
+
+//Run an SQL file the way the installer does, with the table prefix
+function runSQLFile($sqlFile) {
+  global $db;
   $statement = "";
   foreach (file($sqlFile) as $line) {
     if (substr($line, 0, 2) == '--' || trim($line) == '') { continue; }
     $statement .= $line;
     if (substr(trim($line), -1, 1) == ';') {
-      if (!$db->query($statement)) {
+      if (!$db->query(prefixTables($statement))) {
         failTest("Setting up from ".$sqlFile." failed: ".$db->error);
       }
       $statement = "";
     }
   }
-  $db->query("INSERT INTO `config` VALUES('base_url', 'glossary.example.org/');");
+  $db->query("INSERT INTO ".table("config")." VALUES('base_url', 'glossary.example.org/');");
   $GLOBALS["ontomasticon"]["config"] = getConfig();
   $GLOBALS["ontomasticon"]["CVs"] = getCVs();
 }
@@ -43,12 +51,12 @@ function termForm($fields) {
 }
 
 function termRow($shortname) {
-  $result = dbQuery("SELECT * FROM `terms` WHERE `shortname` = ?;", array($shortname));
+  $result = dbQuery("SELECT * FROM ".table("terms")." WHERE `shortname` = ?;", array($shortname));
   return(($result) ? $result->fetch_assoc() : null);
 }
 
 function passwordHashFor($email) {
-  $result = dbQuery("SELECT `password` FROM `users` WHERE `email` = ?;", array($email));
+  $result = dbQuery("SELECT `password` FROM ".table("users")." WHERE `email` = ?;", array($email));
   return($result->fetch_assoc()["password"]);
 }
 
@@ -68,10 +76,10 @@ function runUpdate() {
 section("Fresh install");
 resetDatabase("inst/ontomasticon.sql");
 checkSame("database version matches the code", (string)$version, (string)$GLOBALS["ontomasticon"]["config"]["version_db"]);
-check("terms have a reference column", $db->query("SELECT `reference` FROM `terms` LIMIT 1;") !== FALSE);
-check("the login_attempts table exists", $db->query("SELECT 1 FROM `login_attempts` LIMIT 1;") !== FALSE);
-check("terms have created and modified columns", $db->query("SELECT `created`, `modified` FROM `terms` LIMIT 1;") !== FALSE);
-check("vocabularies have a prefix column", $db->query("SELECT `prefix` FROM `cv` LIMIT 1;") !== FALSE);
+check("terms have a reference column", $db->query("SELECT `reference` FROM ".table("terms")." LIMIT 1;") !== FALSE);
+check("the login_attempts table exists", $db->query("SELECT 1 FROM ".table("login_attempts")." LIMIT 1;") !== FALSE);
+check("terms have created and modified columns", $db->query("SELECT `created`, `modified` FROM ".table("terms")." LIMIT 1;") !== FALSE);
+check("vocabularies have a prefix column", $db->query("SELECT `prefix` FROM ".table("cv")." LIMIT 1;") !== FALSE);
 check("the linked data settings exist", count(array_intersect(array("publisher", "license", "prefix"), array_keys(getConfig()))) == 3);
 
 section("Adding terms");
@@ -106,7 +114,7 @@ foreach (array("css", "README.md", "Admin", "glossary.php") as $reserved) {
 termForm(array("shortname" => "user", "name" => "User", "opaque" => "opaque"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("but allows one for an opaque term, whose URI uses its id", $ok && termRow("user") != null);
-dbQuery("DELETE FROM `terms` WHERE `shortname` = 'user';");
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'user';");
 termForm(array("shortname" => "42", "name" => "Forty-two"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("refuses a short name made only of digits, which could share a URI with an opaque term's id", !$ok && strpos($out, "only of digits") !== FALSE && termRow("42") == null);
@@ -171,7 +179,7 @@ checkSame("a term without a broader term has none", null, $siteTerms["sound"]->b
 
 section("Editing terms");
 $GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "admin", "active_page" => "term", "active_subpage" => "edit", "active_subsubpage" => "bird_song");
-dbQuery("UPDATE `terms` SET `created` = '2020-01-01 09:00:00', `modified` = '2020-01-01 09:00:00' WHERE `shortname` = 'bird_song';");
+dbQuery("UPDATE ".table("terms")." SET `created` = '2020-01-01 09:00:00', `modified` = '2020-01-01 09:00:00' WHERE `shortname` = 'bird_song';");
 termForm(array("name" => "Birdsong", "parent" => "sound", "reference" => "Jones 2021"));
 list($out, $ok) = capture(function() { return(editTerm()); });
 check("saves changes", $ok && termRow("bird_song")["name"] == "Birdsong" && termRow("bird_song")["reference"] == "Jones 2021");
@@ -236,7 +244,7 @@ check("editing refuses to move a term out of its vocabulary when the site uses i
 termForm(array("name" => "Application programming interface", "cv" => "birds"));
 list($out, $ok) = capture(function() { return(editTerm()); });
 check("but saves other changes to it", $ok && termRow("api")["name"] == "Application programming interface");
-dbQuery("UPDATE `terms` SET `cv` = NULL WHERE `shortname` = 'api';");
+dbQuery("UPDATE ".table("terms")." SET `cv` = NULL WHERE `shortname` = 'api';");
 termForm(array("name" => "API", "cv" => "none"));
 list($out, $ok) = capture(function() { return(editTerm()); });
 check("still edits a term saved outside a vocabulary before short names were checked", $ok && termRow("api")["name"] == "API");
@@ -280,11 +288,28 @@ $_POST["license"] = "";
 $_POST["prefix"] = "g l";
 list($out, $ok) = capture(function() { return(saveConfig()); });
 check("refuses a namespace prefix that can't be used", !$ok && strpos($out, "namespace prefix must") !== FALSE && getConfig()["prefix"] == "gl");
-dbQuery("DELETE FROM `config` WHERE `key` = 'publisher';");
+dbQuery("DELETE FROM ".table("config")." WHERE `key` = 'publisher';");
 $_POST["prefix"] = "gl";
 $_POST["publisher"] = "Restored publisher";
 list($out, $ok) = capture(function() { return(saveConfig()); });
 check("saves a setting whose row is missing, as before the update that adds it", $ok && getConfig()["publisher"] == "Restored publisher");
+$_POST["languages"] = " fr,  pt-BR ";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("saves the other languages, separated by single spaces", $ok && getConfig()["languages"] == "fr pt-BR");
+$_POST["languages"] = "fr ../lang/x";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("refuses other languages that aren't language codes", !$ok && strpos($out, "Other languages must be language codes") !== FALSE && getConfig()["languages"] == "fr pt-BR");
+$_POST["languages"] = "";
+capture(function() { return(saveConfig()); });
+
+section("Readiness report");
+$issues = array();
+foreach (siteReadinessIssues() as $issue) {
+  $issues[$issue["id"]] = array_column($issue["items"], "label");
+}
+checkSame("reports that the site has no license", array("Site configuration"), isset($issues["license"]) ? $issues["license"] : null);
+checkSame("and the terms without a definition", array("animal_sound", "bird_song", "wren_song"), isset($issues["definition"]) ? $issues["definition"] : null);
+check("but not the site's namespace prefix, which is set", !isset($issues["prefix"]));
 
 section("Users and logging in");
 $_POST = array("first_name" => "Ada", "surname" => "Editor", "email" => " ada@example.org ", "password" => " correct horse ", "role" => "editor");
@@ -303,7 +328,7 @@ for ($i = 0; $i < LOGIN_MAX_PER_EMAIL; $i++) {
   tryLogin("ada@example.org", "wrong");
 }
 check("locks the account after too many failures", strpos((string)tryLogin("ada@example.org", "correct horse"), "Too many failed logins") !== FALSE);
-$db->query("DELETE FROM `login_attempts`;");
+$db->query("DELETE FROM ".table("login_attempts").";");
 checkSame("logs in again once the failures have expired", null, tryLogin("ada@example.org", "correct horse"));
 
 checkSame("the admin account can log in with the installer's password", null, tryLogin("admin", "password"));
@@ -311,7 +336,7 @@ check("but must then change it", !empty($_SESSION["must_change_password"]));
 check("its cost 4 password hash is upgraded", !password_needs_rehash(passwordHashFor("admin"), PASSWORD_DEFAULT));
 
 $legacyHash = password_hash($db->real_escape_string("it's"), PASSWORD_BCRYPT, array("cost" => 4));
-dbQuery("INSERT INTO `users` (`email`, `password`) VALUES (?, ?);", array("legacy@example.org", $legacyHash));
+dbQuery("INSERT INTO ".table("users")." (`email`, `password`) VALUES (?, ?);", array("legacy@example.org", $legacyHash));
 checkSame("accepts a password hashed the old way, after SQL escaping", null, tryLogin("legacy@example.org", "it's"));
 check("and re-hashes it the new way", password_verify("it's", passwordHashFor("legacy@example.org")));
 
@@ -364,26 +389,37 @@ checkSame("stays logged in", "admin", $_SESSION["user"]);
 
 section("Updating a 0.1 database");
 resetDatabase("tests/fixtures/schema-0.1.sql");
-$db->query("INSERT INTO `users` (`email`, `password`) VALUES ('twice@example.org', 'x'), ('twice@example.org', 'y');");
-$db->query("INSERT INTO `terms` (`shortname`, `parent`, `broader`) VALUES ('orphan', 999, 998);");
+$db->query("INSERT INTO ".table("users")." (`email`, `password`) VALUES ('twice@example.org', 'x'), ('twice@example.org', 'y');");
+$db->query("INSERT INTO ".table("terms")." (`shortname`, `parent`, `broader`) VALUES ('orphan', 999, 998);");
 $_SESSION["user"] = "admin";
 $out = runUpdate();
 check("runs the 0.2 step", strpos($out, "updated to version 0.2") !== FALSE);
 check("stops before 0.3 and lists duplicated email addresses", strpos($out, "twice@example.org") !== FALSE);
 checkSame("leaves the database at 0.2", "0.2", (string)getConfig()["version_db"]);
-check("adds the reference column", $db->query("SELECT `reference` FROM `terms` LIMIT 1;") !== FALSE);
-$db->query("DELETE FROM `users` WHERE `password` = 'y';");
+check("adds the reference column", $db->query("SELECT `reference` FROM ".table("terms")." LIMIT 1;") !== FALSE);
+$db->query("DELETE FROM ".table("users")." WHERE `password` = 'y';");
 $out = runUpdate();
 check("runs the 0.3 step once the duplicate is removed", strpos($out, "updated to version 0.3") !== FALSE);
 check("and then the 0.4 step", strpos($out, "updated to version 0.4") !== FALSE);
 checkSame("leaving the database at 0.4", "0.4", (string)getConfig()["version_db"]);
-check("email addresses must now be unique", !$db->query("INSERT INTO `users` (`email`) VALUES ('twice@example.org');"));
-check("creates the login_attempts table", $db->query("SELECT 1 FROM `login_attempts` LIMIT 1;") !== FALSE);
+check("email addresses must now be unique", !$db->query("INSERT INTO ".table("users")." (`email`) VALUES ('twice@example.org');"));
+check("creates the login_attempts table", $db->query("SELECT 1 FROM ".table("login_attempts")." LIMIT 1;") !== FALSE);
 $orphan = termRow("orphan");
 check("clears links to terms that don't exist", $orphan["parent"] === null && $orphan["broader"] === null);
 check("adds the created and modified columns, leaving existing terms without dates",
   array_key_exists("created", $orphan) && $orphan["created"] === null && $orphan["modified"] === null);
-check("adds the vocabulary prefix column", $db->query("SELECT `prefix` FROM `cv` LIMIT 1;") !== FALSE);
+check("adds the vocabulary prefix column", $db->query("SELECT `prefix` FROM ".table("cv")." LIMIT 1;") !== FALSE);
 checkSame("and the linked data settings, empty", array("", "", ""),
   array(getConfig()["publisher"], getConfig()["license"], getConfig()["prefix"]));
 check("running it again changes nothing", strpos(runUpdate(), "No updates required") !== FALSE);
+
+section("Two sites in one database");
+$firstPrefix = $table_prefix;
+$table_prefix = "second_";
+runSQLFile("inst/ontomasticon.sql");
+dbQuery("UPDATE ".table("config")." SET `value` = 'Second glossary' WHERE `key` = 'site_name';");
+checkSame("a second site's tables have its prefix", 1, $db->query("SHOW TABLES LIKE 'second\\_config';")->num_rows);
+checkSame("it reads its own configuration", "Second glossary", getConfig()["site_name"]);
+check("and not the other site's terms", termRow("orphan") === null);
+$table_prefix = $firstPrefix;
+check("the other site still has its own", termRow("orphan") !== null && getConfig()["site_name"] != "Second glossary");

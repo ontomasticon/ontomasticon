@@ -12,6 +12,7 @@
   }
   if (userAllow("edit-terms")) {
     $links[] = l("Add term", "/admin/term/add");
+    $links[] = l("Linked data readiness", "/admin/readiness");
   }
   print implode(" | ", $links);
   ?>
@@ -50,6 +51,9 @@ switch ($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]) {
     break;
   case "update":
     template("update.php");
+    break;
+  case "readiness":
+    template("admin-readiness.php");
     break;
   case "config":
   default:

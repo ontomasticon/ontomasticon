@@ -29,11 +29,21 @@ $db->set_charset("utf8mb4");
 // Load core functions
 require("core/core.php");
 
-// Start the session before any output is sent
+if (!validTablePrefix(tablePrefix())) {
+  print("<p>The table prefix in settings/db.php may only use letters A to Z, digits and underscores.</p>");
+  exit;
+}
+
+// Load configuration. Its base_url gives the path the site is installed at, which routing and the session cookie need.
+$GLOBALS["ontomasticon"]["config"] = getConfig($db);
+
+// Start the session before any output is sent. The cookie is limited to the site's own path,
+// so sites installed in different subdirectories of one domain don't share a login.
 session_start(array(
   "cookie_httponly" => TRUE,
   "cookie_samesite" => "Lax",
   "cookie_secure" => requestIsHttps(),
+  "cookie_path" => basePath()."/",
   "use_strict_mode" => TRUE
 ));
 
@@ -63,13 +73,12 @@ if (isset($_SESSION["user"]) && !empty($_SESSION["must_change_password"])) {
     || ($page["page_type"] == "user" && $page["active_page"] == "settings")
     || ($page["page_type"] == "user" && $page["active_page"] == "login" && !isset($_POST['submit']));
   if (!$allowed) {
-    header("Location: /user/settings");
+    header("Location: ".sitePath("/user/settings"));
     exit;
   }
 }
 
-// Load configuration
-$GLOBALS["ontomasticon"]["config"] = getConfig($db);
+rememberLanguage();
 $GLOBALS["ontomasticon"]["language"] = detectLanguage();
 $GLOBALS["ontomasticon"]["cv_count"] = CVcount($db);
 $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
@@ -93,5 +102,7 @@ switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
     print "pong";
     break;
   default:
+    //Pages are shown in the language the browser prefers, unless one has been chosen
+    header("Vary: Accept-Language", FALSE);
     template("core.php");
 }

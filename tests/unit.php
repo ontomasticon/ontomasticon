@@ -13,6 +13,17 @@ checkSame("h() treats NULL as an empty string", "", h(null));
 $_SERVER["REQUEST_URI"] = "/admin/term/edit/x'><script>";
 checkSame("form actions are escaped", "/admin/term/edit/x&#039;&gt;&lt;script&gt;", formAction());
 
+section("Table names");
+checkSame("tables have no prefix by default", "`terms`", table("terms"));
+$table_prefix = "site_";
+checkSame("with a table prefix, table names start with it", "`site_terms`", table("terms"));
+checkSame("SQL files get the prefix on the tables they create and fill, and nowhere else",
+  "DROP TABLE IF EXISTS `site_config`;\nCREATE TABLE `site_cv` (\n  `cv` varchar(50)\n);\nINSERT INTO `site_users` (email) VALUES ('terms');",
+  prefixTables("DROP TABLE IF EXISTS `config`;\nCREATE TABLE `cv` (\n  `cv` varchar(50)\n);\nINSERT INTO users (email) VALUES ('terms');"));
+check("a prefix may use letters, digits and underscores, or be empty", validTablePrefix("Site_2") && validTablePrefix(""));
+check("but nothing that could change the SQL", !validTablePrefix("a-b") && !validTablePrefix("x`; DROP") && !validTablePrefix("site\n"));
+$table_prefix = null;
+
 section("IP address ranges");
 check("IPv4 address inside a /16", ipInRanges("192.168.1.5", array("192.168.0.0/16")));
 check("IPv4 address outside a /16", !ipInRanges("192.169.0.1", array("192.168.0.0/16")));
@@ -175,6 +186,72 @@ checkSame("links keep the language and escape their text and address",
   "<a href='/cv/a&#039;b?lang=jibberish'>&lt;b&gt;</a>", l("<b>", "/cv/a'b"));
 $_GET = array();
 unset($GLOBALS["ontomasticon"]["language_data"]);
+
+section("Installed in a subdirectory");
+checkSame("at the top of a domain the base path is empty", "", basePath());
+$GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/terms/";
+checkSame("the base path is the path in base_url", "/terms", basePath());
+checkSame("the home page, with a trailing slash", array("page_type" => "home"), routeFor("/terms/"));
+checkSame("the home page, without one", array("page_type" => "home"), routeFor("/terms"));
+checkSame("routes by the path within the site",
+  array("page_type" => "cv", "active_page" => "birds"), routeFor("/terms/cv/birds?lang=fr"));
+checkSame("a term's own address", array("page_type" => "term", "active_page" => "song"), routeFor("/terms/song"));
+checkSame("a path that only starts with the same letters isn't in the site",
+  array("page_type" => "term", "active_page" => "termsong"), routeFor("/termsong"));
+checkSame("links to the site's pages include the subdirectory", "<a href='/terms/cv/birds'>birds</a>", l("birds", "/cv/birds"));
+checkSame("links to other sites don't", "<a href='https://example.org/'>x</a>", l("x", "https://example.org/"));
+checkSame("linked data links include it", "/terms/api/cv/", linkedDataFor(array("page_type" => "home")));
+checkSame("term URIs include it", "https://glossary.example.org/terms/cv/birds#song",
+  term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
+unset($GLOBALS["ontomasticon"]["pageInfo"]);
+$GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/";
+section("Choosing a language");
+$GLOBALS["ontomasticon"]["config"]["languages"] = "jibberish pt-BR";
+checkSame("the site is offered in its default language and the other languages setting", array("en", "jibberish", "pt-BR"), siteLanguages());
+function languageFor($acceptLanguage, $get = array(), $remembered = null) {
+  if ($acceptLanguage === null) {
+    unset($_SERVER["HTTP_ACCEPT_LANGUAGE"]);
+  } else {
+    $_SERVER["HTTP_ACCEPT_LANGUAGE"] = $acceptLanguage;
+  }
+  $_GET = $get;
+  if ($remembered === null) {
+    unset($_SESSION["lang"]);
+  } else {
+    $_SESSION["lang"] = $remembered;
+  }
+  return(detectLanguage());
+}
+checkSame("the default language when the browser doesn't say", "en", languageFor(null));
+checkSame("the language the browser asks for", "jibberish", languageFor("jibberish"));
+checkSame("skipping languages the site isn't offered in", "pt-BR", languageFor("fr-CH, fr;q=0.9, pt-BR;q=0.8, en;q=0.5"));
+checkSame("most preferred first, whatever the order", "jibberish", languageFor("en;q=0.5, jibberish"));
+checkSame("a language with a region matches the language", "en", languageFor("en-GB"));
+checkSame("and a language matches the language with a region", "pt-BR", languageFor("pt"));
+checkSame("in any case", "pt-BR", languageFor("PT-br"));
+checkSame("not a language refused with q=0", "en", languageFor("jibberish;q=0"));
+checkSame("the default language when the browser accepts any", "en", languageFor("*"));
+checkSame("?lang= overrides the browser", "en", languageFor("jibberish", array("lang" => "en")));
+checkSame("as does a language chosen earlier in the visit", "pt-BR", languageFor("jibberish", array(), "pt-BR"));
+checkSame("unless the site is no longer offered in it", "en", languageFor(null, array(), "fr"));
+languageFor(null, array("lang" => "jibberish"));
+rememberLanguage();
+checkSame("a language chosen with ?lang= is remembered", "jibberish", isset($_SESSION["lang"]) ? $_SESSION["lang"] : null);
+languageFor(null, array("lang" => "xx"));
+rememberLanguage();
+check("unless the site isn't offered in it", !isset($_SESSION["lang"]));
+
+$_SERVER["REQUEST_URI"] = "/cv/birds?lang=en&x=1";
+languageFor(null, array("lang" => "en", "x" => "1"));
+$switcher = languageSwitcher();
+check("the language switcher links to the same page in each other language",
+  strpos($switcher, "<a href='/cv/birds?lang=jibberish&amp;x=1' hreflang='jibberish' lang='jibberish'>jibberish</a>") !== FALSE
+  && strpos($switcher, "<a href='/cv/birds?lang=pt-BR&amp;x=1'") !== FALSE);
+check("and marks the current language without linking it", strpos($switcher, "<strong lang='en'>en</strong>") !== FALSE && strpos($switcher, "lang=en") === FALSE);
+$GLOBALS["ontomasticon"]["config"]["languages"] = "";
+checkSame("there is no switcher when the site has one language", "", languageSwitcher());
+languageFor(null);
+unset($GLOBALS["ontomasticon"]["config"]["languages"]);
 
 section("CSRF tokens");
 $_SESSION = array();
@@ -387,3 +464,44 @@ checkSame("configValue() gives an empty string for a setting that isn't there", 
 checkSame("prefixError() accepts a prefix that starts with a letter", null, prefixError("call-type_2"));
 checkSame("and an empty prefix, meaning none", null, prefixError(""));
 check("but refuses others", prefixError("2calls") !== null && prefixError("call type") !== null && prefixError(str_repeat("a", 21)) !== null);
+
+section("Readiness report");
+check("validLanguageTag() accepts en and pt-BR", validLanguageTag("en") && validLanguageTag("pt-BR"));
+check("but not en_GB, an empty language or one with a trailing newline", !validLanguageTag("en_GB") && !validLanguageTag("") && !validLanguageTag("en\n"));
+$readinessTerms = array(
+  testTerm(array("id" => 20, "shortname" => "CallingSong", "name" => "Calling Song", "description" => "Produced by a male.", "cv" => "callType")),
+  testTerm(array("id" => 21, "shortname" => "PrematingSong", "name" => "Premating Song", "description" => "<p></p>", "cv" => "callType")),
+  testTerm(array("id" => 22, "shortname" => "Canto", "name" => "Canto", "description" => "A song.", "language" => "pt_BR", "cv" => "callType")),
+  testTerm(array("id" => 23, "shortname" => "odd term", "name" => "Odd term", "description" => "Saved before short names were checked.")),
+  testTerm(array("id" => 24, "shortname" => "api", "name" => "API", "description" => "Uses the address of the API.")),
+  testTerm(array("id" => 25, "shortname" => "AgreementSong", "name" => "Agreement Song", "description" => "The female\x92s response.", "cv" => "callType")),
+  testTerm(array("id" => 26, "shortname" => "AttractionSong", "name" => "Attraction Song", "description" => "A synonym.", "cv" => "callType", "invalid_reason" => "Synonym")),
+  testTerm(array("id" => 27, "shortname" => "unnamed", "description" => "No name.", "cv" => "callType"))
+);
+$readinessVocabularies = array(
+  "callType" => array("shortname" => "callType", "name" => "Type of Call", "prefix" => null),
+  "unnamedcv" => array("shortname" => "unnamedcv", "name" => "", "prefix" => "unnamed")
+);
+$readiness = readinessIssues($readinessTerms, $readinessVocabularies, array("license" => "", "prefix" => ""));
+$issues = array();
+foreach ($readiness as $issue) {
+  $issues[$issue["id"]] = array_column($issue["items"], "label");
+}
+checkSame("lists each kind of problem once, always in the same order",
+  array("license", "prefix", "vocabulary-name", "term-name", "definition", "language", "shortname", "uri-clash", "utf8", "synonym"), array_keys($issues));
+checkSame("reports a missing license", array("Site configuration"), $issues["license"]);
+checkSame("the site's own terms and vocabularies without a namespace prefix", array("Terms that aren't in a controlled vocabulary", "callType"), $issues["prefix"]);
+checkSame("a vocabulary without a name", array("unnamedcv"), $issues["vocabulary-name"]);
+checkSame("a term without a name", array("callType: unnamed"), $issues["term-name"]);
+checkSame("a term whose definition is empty once its HTML is removed", array("callType: PrematingSong"), $issues["definition"]);
+checkSame("a language that isn't a valid language tag", array("callType: Canto"), $issues["language"]);
+checkSame("a short name saved before short names were checked", array("odd term"), $issues["shortname"]);
+checkSame("a URI that clashes with the site's own addresses", array("api"), $issues["uri-clash"]);
+checkSame("text that isn't valid UTF-8", array("callType: AgreementSong"), $issues["utf8"]);
+checkSame("and a synonym without a parent term", array("callType: AttractionSong"), $issues["synonym"]);
+check("a term with no problems isn't listed", !in_array("callType: CallingSong", call_user_func_array("array_merge", array_values($issues))));
+checkSame("links each term to its edit page", array("label" => "callType: PrematingSong", "link" => "/admin/term/edit/PrematingSong"), $readiness[4]["items"][0]);
+checkSame("and each vocabulary to its edit page", array("label" => "callType", "link" => "/admin/cv/edit/callType"), $readiness[1]["items"][1]);
+checkSame("a site with nothing to fix has no problems", array(), readinessIssues(array($readinessTerms[0]),
+  array("callType" => array("shortname" => "callType", "name" => "Type of Call", "prefix" => "calltype")),
+  array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "")));
