@@ -428,3 +428,35 @@ checkSame("and each vocabulary to its edit page", array("label" => "callType", "
 checkSame("a site with nothing to fix has no problems", array(), readinessIssues(array($readinessTerms[0]),
   array("callType" => array("shortname" => "callType", "name" => "Type of Call", "prefix" => "calltype")),
   array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "")));
+
+section("Term types");
+checkSame("termType() accepts concept, property and class", array("concept", "property", "class"),
+  array(termType("concept"), termType("property"), termType("class")));
+checkSame("and treats anything else, including no type, as a concept", array("concept", "concept"), array(termType("widget"), termType(null)));
+checkSame("a term saved before types existed is a concept", "concept", Term::fromRow(array("id" => 1, "shortname" => "old"))->type);
+$duration = testTerm(array("id" => 30, "shortname" => "Duration", "name" => "Duration", "description" => "How long.", "type" => "property"));
+$pulseDuration = testTerm(array("id" => 31, "shortname" => "PulseDuration", "name" => "Pulse Duration", "description" => "How long a pulse lasts.",
+  "type" => "property", "broader" => 30), array("broader" => $duration));
+$callDuration = testTerm(array("id" => 32, "shortname" => "CallDuration", "name" => "Call Duration", "description" => "How long a call lasts.",
+  "type" => "property", "broader" => 2), array("broader" => $premating));
+$component = testTerm(array("id" => 33, "shortname" => "Component", "name" => "Call component", "description" => "A part of a call.",
+  "cv" => "components", "type" => "class"));
+$syllable = testTerm(array("id" => 34, "shortname" => "Syllable", "name" => "Syllable", "description" => "A unit of a call.",
+  "cv" => "components", "type" => "class", "broader" => 33), array("broader" => $component));
+$ld = termJSONLD($pulseDuration);
+checkSame("a property is also a SKOS concept, so it can still be used as a measurement type", array("skos:Concept", "rdf:Property"), $ld["@type"]);
+checkSame("and is defined by its vocabulary", array("@id" => "https://glossary.example.org/"), $ld["rdfs:isDefinedBy"]);
+checkSame("a property under another property is a sub-property of it", array("@id" => "https://glossary.example.org/Duration"), $ld["rdfs:subPropertyOf"]);
+check("as well as narrower in SKOS", isset($ld["skos:broader"]));
+$ld = termJSONLD($callDuration);
+check("a property under a concept is narrower, but not a sub-property", isset($ld["skos:broader"]) && !isset($ld["rdfs:subPropertyOf"]));
+$ld = termJSONLD($syllable);
+checkSame("a class is also a SKOS concept", array("skos:Concept", "rdfs:Class"), $ld["@type"]);
+checkSame("and a sub-class of a broader class", array("@id" => "https://glossary.example.org/cv/components#Component"), $ld["rdfs:subClassOf"]);
+check("a concept only has its SKOS type", termJSONLD($premating)["@type"] === "skos:Concept" && !isset(termJSONLD($premating)["rdfs:isDefinedBy"]));
+check("Turtle gives both types", strpos(turtleOutput($ld), " a skos:Concept, rdfs:Class ;") !== FALSE);
+$typeIssues = array();
+foreach (readinessIssues(array($pulseDuration, $callDuration, $syllable), array(), array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "gl")) as $issue) {
+  $typeIssues[$issue["id"]] = array_column($issue["items"], "label");
+}
+checkSame("the readiness report lists only a term under a broader term of a different type", array("type-hierarchy" => array("CallDuration")), $typeIssues);

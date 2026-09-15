@@ -19,11 +19,14 @@ class Term {
   //When the term was added and last changed, as database DATETIMEs in UTC, or NULL if not known
   public $created;
   public $modified;
+  //"concept", "property" or "class" (see termTypes())
+  public $type = "concept";
 
   //Related terms that have been loaded, by relation name
   private $related = array();
 
-  //Make a term from a row of the terms table. Columns missing from the row are left as NULL.
+  //Make a term from a row of the terms table. Columns missing from the row are left as NULL,
+  //except the type, which is a concept unless the row gives another type.
   public static function fromRow($row) {
     $columns = array(
       "id" => "id", "shortname" => "shortname", "name" => "name", "description" => "description",
@@ -37,6 +40,7 @@ class Term {
         $term->$property = $row[$column];
       }
     }
+    $term->type = termType(isset($row["type"]) ? $row["type"] : null);
     return($term);
   }
 

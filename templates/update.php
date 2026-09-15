@@ -92,6 +92,20 @@ if (!userAllow("administer")) {
     }
   }
 
+  if (!$failed && version_compare($version_db, "0.4.1", "<")) {
+    //Whether each term is a concept, a property or a class (see termTypes()). Existing terms are concepts.
+    $sql = "ALTER TABLE `terms` ADD COLUMN `type` VARCHAR(10) NOT NULL DEFAULT 'concept' AFTER `opaque`;";
+    //1060: the column already exists
+    if (mysqli_query($db, $sql) || $db->errno == 1060) {
+      $version_db = setDBVersion("0.4.1");
+      $updated = TRUE;
+      print "<p>".t("Ontomasticon has been updated to version 0.4.1")."</p>";
+    } else {
+      $failed = TRUE;
+      print "<div class='error'><p>".t("Update to version 0.4.1 failed").": ".h($db->error)."</p></div>";
+    }
+  }
+
   if ($updated) {
     $GLOBALS["ontomasticon"]["config"] = getConfig($db);
   } elseif (!$failed) {

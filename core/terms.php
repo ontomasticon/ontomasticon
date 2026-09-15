@@ -168,6 +168,21 @@ function termShortnameClash($shortname, $cv, $opaque) {
   return(null);
 }
 
+//The types a term can have, with their names. Every term is a SKOS concept; a property is also a characteristic
+//that is measured or recorded, and a class is also a kind of thing.
+function termTypeLabels() {
+  return(array("concept" => "Concept", "property" => "Property", "class" => "Class"));
+}
+
+function termTypes() {
+  return(array_keys(termTypeLabels()));
+}
+
+//A term type from a form or the database. Anything that isn't one of termTypes(), including no type, is a concept.
+function termType($type) {
+  return(in_array($type, termTypes(), TRUE) ? $type : "concept");
+}
+
 function editTerm() {
   $relations = termRelations();
   if ($relations === null) {
@@ -190,7 +205,9 @@ function editTerm() {
     return(FALSE);
   }
 
-  $sql  = "UPDATE `terms` SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, ";
+  $type = termType(isset($_POST["type"]) ? $_POST["type"] : "concept");
+
+  $sql  = "UPDATE `terms` SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, `type` = ?, ";
   $sql .= "`invalid_reason` = ?, `cv` = ?, `parent` = ?, `broader` = ?, `reference` = ?, `modified` = UTC_TIMESTAMP() ";
   $sql .= "WHERE `shortname` = ?;";
   return(reportSaved(dbQuery($sql, array(
@@ -198,6 +215,7 @@ function editTerm() {
     $description,
     $language,
     $opaque,
+    $type,
     ($invalid == "") ? null : $invalid,
     ($cv == "") ? null : $cv,
     $relations["parent"],
@@ -238,14 +256,17 @@ function addTerm() {
     return(FALSE);
   }
 
-  $sql  = "INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`, `created`, `modified`) ";
-  $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP());";
+  $type = termType(isset($_POST["type"]) ? $_POST["type"] : "concept");
+
+  $sql  = "INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`, `type`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`, `created`, `modified`) ";
+  $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP());";
   return(reportSaved(dbQuery($sql, array(
     $shortname,
     $name,
     $description,
     $language,
     $opaque,
+    $type,
     ($invalid == "") ? null : $invalid,
     ($cv == "") ? null : $cv,
     $relations["parent"],

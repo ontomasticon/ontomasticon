@@ -5,6 +5,13 @@
     print termEditLink($GLOBALS["ontomasticon"]["term"]["shortname"]);
   ?></h3>
   <p><?php print term2URI($GLOBALS["ontomasticon"]["term"], TRUE); ?></p>
+  <?php
+  //Most terms are concepts, so only other types are shown
+  $termType = termType(isset($GLOBALS["ontomasticon"]["term"]["type"]) ? $GLOBALS["ontomasticon"]["term"]["type"] : null);
+  if ($termType != "concept") {
+    print '<p class="term_type">'.h(t(termTypeLabels()[$termType])).'</p>';
+  }
+  ?>
   <p><?php print h($GLOBALS["ontomasticon"]["term"]["language"]); ?></p>
   <p><?php print $GLOBALS["ontomasticon"]["term"]["description"]; ?></p>
   <?php

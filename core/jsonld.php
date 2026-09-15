@@ -80,9 +80,12 @@ function vocabularyJSONLD($vocabulary, $terms) {
 //A term as a SKOS concept, without the context, for use inside a larger document
 function termNode($term) {
   $scheme = array("@id" => $term->vocabulary()->uri());
+  //Every term is a SKOS concept, so SKOS tools and Darwin Core measurement types can use any of them.
+  //Properties and classes are also typed as what they are.
+  $rdfTypes = array("property" => "rdf:Property", "class" => "rdfs:Class");
   $node = array(
     "@id" => $term->uri(),
-    "@type" => "skos:Concept"
+    "@type" => isset($rdfTypes[$term->type]) ? array("skos:Concept", $rdfTypes[$term->type]) : "skos:Concept"
   );
   if ($term->name != "") {
     $node["rdfs:label"] = jsonLDText($term->name, $term->language);
@@ -96,9 +99,16 @@ function termNode($term) {
   }
 
   $node["skos:inScheme"] = $scheme;
+  if (isset($rdfTypes[$term->type])) {
+    $node["rdfs:isDefinedBy"] = $scheme;
+  }
   $broader = $term->broader();
   if ($broader != null) {
     $node["skos:broader"] = jsonLDLink($broader);
+    //A property or class under another of the same type is also a sub-property or sub-class of it
+    if (isset($rdfTypes[$term->type]) && $broader->type == $term->type) {
+      $node[($term->type == "property") ? "rdfs:subPropertyOf" : "rdfs:subClassOf"] = jsonLDLink($broader);
+    }
   } elseif (!$term->isDeprecated()) {
     $node["skos:topConceptOf"] = $scheme;
   }

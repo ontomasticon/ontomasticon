@@ -7,7 +7,9 @@
 
 //Problems in the site's own terms, vocabularies and settings (see readinessIssues())
 function siteReadinessIssues() {
-  return(readinessIssues(Term::all(), getCVs(), $GLOBALS["ontomasticon"]["config"]));
+  $terms = Term::all();
+  Term::loadRelations($terms);
+  return(readinessIssues($terms, getCVs(), $GLOBALS["ontomasticon"]["config"]));
 }
 
 //Problems in a list of terms, vocabularies (rows of the cv table) and site settings. Each problem is an array with
@@ -24,7 +26,8 @@ function readinessIssues($terms, $vocabularies, $config) {
     "shortname" => t("Terms whose short name isn't safe in a URI, so their URI is invalid"),
     "uri-clash" => t("Terms whose URI clashes with another address on the site, so it doesn't reach the term"),
     "utf8" => t("Terms with text that isn't valid UTF-8, which is shown as a replacement character in RDF"),
-    "synonym" => t("Synonyms without a parent term, so they don't say which term replaces them")
+    "synonym" => t("Synonyms without a parent term, so they don't say which term replaces them"),
+    "type-hierarchy" => t("Terms whose broader term is a different type, such as a property under a concept")
   );
   $items = array_fill_keys(array_keys($problems), array());
   $configLink = "/admin/config";
@@ -80,6 +83,9 @@ function readinessIssues($terms, $vocabularies, $config) {
     }
     if ($term->isSynonym() && $term->parentID == null) {
       $items["synonym"][] = $item;
+    }
+    if ($term->broader() != null && $term->broader()->type != $term->type) {
+      $items["type-hierarchy"][] = $item;
     }
   }
 

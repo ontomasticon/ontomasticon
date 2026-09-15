@@ -73,12 +73,21 @@ check("the login_attempts table exists", $db->query("SELECT 1 FROM `login_attemp
 check("terms have created and modified columns", $db->query("SELECT `created`, `modified` FROM `terms` LIMIT 1;") !== FALSE);
 check("vocabularies have a prefix column", $db->query("SELECT `prefix` FROM `cv` LIMIT 1;") !== FALSE);
 check("the linked data settings exist", count(array_intersect(array("publisher", "license", "prefix"), array_keys(getConfig()))) == 3);
+check("terms have a type column", $db->query("SELECT `type` FROM `terms` LIMIT 1;") !== FALSE);
 
 section("Adding terms");
 termForm(array("shortname" => "sound", "name" => "Sound"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("adds a term", $ok && termRow("sound") != null);
 check("records when the term was added", termRow("sound")["created"] !== null && termRow("sound")["modified"] === termRow("sound")["created"]);
+checkSame("a term is a concept unless it is given another type", "concept", termRow("sound")["type"]);
+termForm(array("shortname" => "pulse_duration", "name" => "Pulse duration", "type" => "property"));
+capture(function() { return(addTerm()); });
+checkSame("saves a term's type", "property", termRow("pulse_duration")["type"]);
+termForm(array("shortname" => "odd_type", "name" => "Odd type", "type" => "widget"));
+capture(function() { return(addTerm()); });
+checkSame("and saves a type it doesn't know as a concept", "concept", termRow("odd_type")["type"]);
+dbQuery("DELETE FROM `terms` WHERE `shortname` IN ('pulse_duration', 'odd_type');");
 termForm(array("shortname" => "sound", "name" => "Duplicate"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("refuses a short name that is already used", !$ok && strpos($out, "already a term") !== FALSE);
@@ -179,6 +188,10 @@ check("records when the term was changed, but not when it was added",
   termRow("bird_song")["created"] == "2020-01-01 09:00:00" && termRow("bird_song")["modified"] > "2020-01-01 09:00:00");
 checkSame("gives when the term was added as a date in JSON-LD", array("@value" => "2020-01-01", "@type" => "xsd:date"),
   termJSONLD(Term::find("bird_song"))["dcterms:created"]);
+termForm(array("name" => "Birdsong", "parent" => "sound", "reference" => "Jones 2021", "type" => "class"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+checkSame("changes a term's type", "class", termRow("bird_song")["type"]);
+checkSame("which its JSON-LD gives", array("skos:Concept", "rdfs:Class"), termJSONLD(Term::find("bird_song"))["@type"]);
 termForm(array("name" => "Changed", "parent" => "missing"));
 list($out, $ok) = capture(function() { return(editTerm()); });
 check("refuses a parent term that doesn't exist", !$ok && termRow("bird_song")["name"] == "Birdsong");
@@ -384,8 +397,9 @@ check("adds the reference column", $db->query("SELECT `reference` FROM `terms` L
 $db->query("DELETE FROM `users` WHERE `password` = 'y';");
 $out = runUpdate();
 check("runs the 0.3 step once the duplicate is removed", strpos($out, "updated to version 0.3") !== FALSE);
-check("and then the 0.4 step", strpos($out, "updated to version 0.4") !== FALSE);
-checkSame("leaving the database at 0.4", "0.4", (string)getConfig()["version_db"]);
+check("and then the 0.4 step", strpos($out, "updated to version 0.4</p>") !== FALSE);
+check("and the 0.4.1 step", strpos($out, "updated to version 0.4.1</p>") !== FALSE);
+checkSame("leaving the database at 0.4.1", "0.4.1", (string)getConfig()["version_db"]);
 check("email addresses must now be unique", !$db->query("INSERT INTO `users` (`email`) VALUES ('twice@example.org');"));
 check("creates the login_attempts table", $db->query("SELECT 1 FROM `login_attempts` LIMIT 1;") !== FALSE);
 $orphan = termRow("orphan");
@@ -395,4 +409,5 @@ check("adds the created and modified columns, leaving existing terms without dat
 check("adds the vocabulary prefix column", $db->query("SELECT `prefix` FROM `cv` LIMIT 1;") !== FALSE);
 checkSame("and the linked data settings, empty", array("", "", ""),
   array(getConfig()["publisher"], getConfig()["license"], getConfig()["prefix"]));
+check("adds the term type column, making existing terms concepts", termRow("orphan")["type"] === "concept");
 check("running it again changes nothing", strpos(runUpdate(), "No updates required") !== FALSE);
