@@ -37,7 +37,7 @@ function getTerms($cv=null) {
     $sql = "SELECT * FROM ".table("terms")." WHERE `cv` = ? AND `invalid_reason` IS NULL ORDER BY `shortname`;";
     $result = dbQuery($sql, array($cv));
   }  else {
-    $sql = "SELECT * FROM ".table("terms")." WHERE `cv` IS NULL AND `invalid_reason` IS NULL;";
+    $sql = "SELECT * FROM ".table("terms")." WHERE `cv` IS NULL AND `invalid_reason` IS NULL ORDER BY `shortname`;";
     $result = dbQuery($sql);
   }
 

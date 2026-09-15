@@ -231,6 +231,11 @@ check("the vocabulary page has an entry for each term, at the fragment of its UR
 check("an opaque term's entry is at its id, as its URI is",
   strpos($body, 'id="'.$opaqueCall["id"].'"') !== FALSE && strpos($body, 'id="opaque_call"') === FALSE
   && term2URI($opaqueCall) === "https://glossary.example.org/cv/calls#".$opaqueCall["id"]);
+list(, , $body) = httpRequest("GET", "/");
+check("the home page lists terms in order of short name, as vocabulary pages do",
+  strpos($body, 'id="acoustic_allometry"') < strpos($body, 'id="agreement_song"') && strpos($body, 'id="agreement_song"') < strpos($body, 'id="2"'));
+list($status, $headers) = httpRequest("GET", "/api/");
+check("the API page varies by Accept-Language, as it is shown in the visitor's language", $status == 200 && hasHeader($headers, '/^Vary: .*Accept-Language/i'));
 
 section("HTTP: content negotiation");
 $asJSONLD = array("Accept: application/ld+json");

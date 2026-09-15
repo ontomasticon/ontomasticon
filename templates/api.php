@@ -1,6 +1,8 @@
 <?php
 switch($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]) {
     case "":
+        //The API page is shown in the visitor's language, like other pages
+        header("Vary: Accept-Language", FALSE);
         template("core.php");
         break;
     case "term":
