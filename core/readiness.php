@@ -2,8 +2,7 @@
 // Ontomasticon: a simple, lightweight, PHP-based ontology browser.
 // Department of Information Retrieval
 //
-// The readiness report: problems that stop the site's vocabularies meeting TDWG's requirements
-// for controlled vocabulary terms, or giving clean RDF
+// The readiness report: problems that stop the site's vocabularies giving complete, clean RDF
 
 //Problems in the site's own terms, vocabularies and settings (see readinessIssues())
 function siteReadinessIssues() {
@@ -19,9 +18,9 @@ function readinessIssues($terms, $vocabularies, $config) {
   $problems = array(
     "license" => t("The site has no license, so its vocabularies don't say how they can be reused"),
     "prefix" => t("Vocabularies without a namespace prefix"),
-    "vocabulary-name" => t("Controlled vocabularies without a name, which TDWG requires"),
-    "term-name" => t("Terms without a name, which TDWG requires as their label"),
-    "definition" => t("Terms without a definition, which TDWG requires"),
+    "vocabulary-name" => t("Controlled vocabularies without a name"),
+    "term-name" => t("Terms without a name, so they have no label"),
+    "definition" => t("Terms without a definition"),
     "language" => t("Terms whose language isn't a valid language tag, so their name and definition have no language in RDF"),
     "shortname" => t("Terms whose short name isn't safe in a URI, so their URI is invalid"),
     "uri-clash" => t("Terms whose URI clashes with another address on the site, so it doesn't reach the term"),
