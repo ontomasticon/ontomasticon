@@ -176,6 +176,25 @@ checkSame("links keep the language and escape their text and address",
 $_GET = array();
 unset($GLOBALS["ontomasticon"]["language_data"]);
 
+section("Installed in a subdirectory");
+checkSame("at the top of a domain the base path is empty", "", basePath());
+$GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/terms/";
+checkSame("the base path is the path in base_url", "/terms", basePath());
+checkSame("the home page, with a trailing slash", array("page_type" => "home"), routeFor("/terms/"));
+checkSame("the home page, without one", array("page_type" => "home"), routeFor("/terms"));
+checkSame("routes by the path within the site",
+  array("page_type" => "cv", "active_page" => "birds"), routeFor("/terms/cv/birds?lang=fr"));
+checkSame("a term's own address", array("page_type" => "term", "active_page" => "song"), routeFor("/terms/song"));
+checkSame("a path that only starts with the same letters isn't in the site",
+  array("page_type" => "term", "active_page" => "termsong"), routeFor("/termsong"));
+checkSame("links to the site's pages include the subdirectory", "<a href='/terms/cv/birds'>birds</a>", l("birds", "/cv/birds"));
+checkSame("links to other sites don't", "<a href='https://example.org/'>x</a>", l("x", "https://example.org/"));
+checkSame("linked data links include it", "/terms/api/cv/", linkedDataFor(array("page_type" => "home")));
+checkSame("term URIs include it", "https://glossary.example.org/terms/cv/birds#song",
+  term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
+unset($GLOBALS["ontomasticon"]["pageInfo"]);
+$GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/";
+
 section("CSRF tokens");
 $_SESSION = array();
 $token = csrfToken();

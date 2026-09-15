@@ -56,8 +56,9 @@ foreach ($lines as $line) {
 
 <h2>Setting base_url</h2>
 <?php
-print(htmlspecialchars($_SERVER['SERVER_NAME'], ENT_QUOTES, 'UTF-8'));
-$base_url = $_SERVER['SERVER_NAME']."/";
+//The site is installed in the directory above inst/, which may be a subdirectory of the domain
+$base_url = $_SERVER['SERVER_NAME'].rtrim(str_replace("\\", "/", dirname(dirname($_SERVER['SCRIPT_NAME']))), "/")."/";
+print(htmlspecialchars($base_url, ENT_QUOTES, 'UTF-8'));
 $stmt = $db->prepare("INSERT INTO `config` VALUES('base_url', ?);");
 $stmt->bind_param("s", $base_url);
 $stmt->execute();
@@ -66,4 +67,4 @@ $stmt->execute();
 <h2>Done!</h2>
 <p>Further steps to secure the installation will be provided when you first log in.</p>
 <p>Login details are admin:password.</p>
-<p><a href="https://<?php print(htmlspecialchars($_SERVER['SERVER_NAME'], ENT_QUOTES, 'UTF-8')); ?>">Go to homepage</a>.</p>
+<p><a href="https://<?php print(htmlspecialchars($base_url, ENT_QUOTES, 'UTF-8')); ?>">Go to homepage</a>.</p>
