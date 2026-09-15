@@ -338,6 +338,10 @@ checkSame("with its synonyms' names as other names", array(array("@value" => "Al
   isset($data["alternateName"]) ? $data["alternateName"] : null);
 checkSame("in the site's set of terms", array("@type" => "DefinedTermSet", "@id" => "https://glossary.example.org/", "name" => array("@value" => "Site name.", "@language" => "en"), "url" => "https://glossary.example.org/"),
   isset($data["inDefinedTermSet"]) ? $data["inDefinedTermSet"] : null);
+check("the term's page lists its synonym", strpos($body, "<td class='invalid_reason'>Synonym</td><td class='child_term_name'><a href='https://glossary.example.org/allometry'>Allometry</a></td>") !== FALSE);
+list(, , $body) = httpRequest("GET", "/allometry");
+check("and the synonym's page links back to the term it is a synonym of",
+  strpos($body, "<td class='invalid_reason'>Synonym of</td><td class='child_term_name'><a href='https://glossary.example.org/acoustic_allometry'>Acoustic allometry</a></td>") !== FALSE);
 $db->query("DELETE FROM ".table("terms")." WHERE `shortname` = 'allometry';");
 $data = structuredData(httpRequest("GET", "/")[2]);
 $ids = isset($data["hasDefinedTerm"]) ? array_column($data["hasDefinedTerm"], "@id") : array();
