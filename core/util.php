@@ -82,11 +82,22 @@ function reportSaved($result, $success = "Saved.") {
 //The site's address, with a trailing slash. The base_url setting may start with
 //http:// or https://; if it has neither, https:// is assumed.
 function siteURL() {
-  $base = $GLOBALS["ontomasticon"]["config"]["base_url"];
+  $base = configValue("base_url");
   if (preg_match('#^https?://#i', $base)) {
     return($base);
   }
   return("https://".$base);
+}
+
+//The path the site is installed at, from the base_url setting, without a trailing slash:
+//"" at the top of a domain, or for example "/glossary" in a subdirectory
+function basePath() {
+  return(rtrim((string)parse_url(siteURL(), PHP_URL_PATH), "/"));
+}
+
+//The address of one of the site's pages or files, from its path within the site (which starts with /)
+function sitePath($path) {
+  return(basePath().$path);
 }
 
 //Short names of terms and vocabularies are used as they are in URIs (the site address followed by
@@ -165,9 +176,10 @@ function requestIsHttps() {
     && strtolower($_SERVER["HTTP_X_FORWARDED_PROTO"]) == "https");
 }
 
-//Hyperlinking function
+//Hyperlinking function. A $url starting with / is a path within the site.
 function l($text, $url) {
   if (substr($url, 0, 1) == '/') {
+    $url = sitePath($url);
     if (isset($_GET["lang"])) {
       $url .= "?lang=".urlencode(detectLanguage());
     }

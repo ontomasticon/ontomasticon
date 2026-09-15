@@ -293,5 +293,21 @@ check("admin pages are refused after logging out", strpos($body, "You do not hav
 list(, , $body) = httpRequest("GET", "/admin/readiness");
 check("and so is the readiness report", strpos($body, "You do not have permission") !== FALSE && strpos($body, "<h3 id=") === FALSE);
 
+section("HTTP: installed in a subdirectory");
+$db->query("UPDATE `config` SET `value` = 'glossary.example.org/sub/' WHERE `key` = 'base_url';");
+unset($GLOBALS["http_cookie"]);
+list($status, $headers, $body) = httpRequest("GET", "/sub/");
+checkSame("the home page loads at the subdirectory", 200, $status);
+check("the session cookie is limited to the subdirectory", hasHeader($headers, '#^Set-Cookie: PHPSESSID=.*path=/sub/;#i'));
+check("the stylesheet and links are in the subdirectory",
+  strpos($body, 'href="/sub/css/default.css"') !== FALSE && strpos($body, "href='/sub/user/login'") !== FALSE);
+list(, , $body) = httpRequest("GET", "/sub/cv/calls");
+check("vocabulary pages are found in the subdirectory", strpos($body, "Controlled Vocabulary: Calls") !== FALSE);
+list($status, , $body) = httpRequest("GET", "/sub/acoustic_allometry", null, $asJSONLD);
+$concept = json_decode($body, TRUE);
+check("a term's URI includes the subdirectory, and is found there",
+  $status == 200 && is_array($concept) && $concept["@id"] === "https://glossary.example.org/sub/acoustic_allometry");
+$db->query("UPDATE `config` SET `value` = 'glossary.example.org/' WHERE `key` = 'base_url';");
+
 proc_terminate($server);
 proc_close($server);

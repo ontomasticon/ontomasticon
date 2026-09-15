@@ -1,5 +1,15 @@
 # nginx configuration for Ontomasticon with PHP-FPM.
 # Change server_name, root and fastcgi_pass to suit your server, and add your HTTPS settings.
+#
+# To install in a subdirectory, such as example.org/glossary/, put the files in that directory
+# under root (here /var/www/ontomasticon/glossary), and add the subdirectory to the start of
+# each location below and to the index.php in try_files, for example:
+#     location ~ ^/glossary/(core|templates|lang|tests)/ {
+#     location = /glossary/settings/user.css {
+#     location ^~ /glossary/settings/ {
+#     location /glossary/ {
+#         try_files $uri /glossary/index.php$is_args$args;
+# Then set base_url (on the site configuration page) to include the subdirectory.
 
 server {
     listen 80;

@@ -6,7 +6,13 @@
 
 function activePage() {
   $ret = array();
-  $parts = explode('/', explode('?',$_SERVER['REQUEST_URI'])[0]);
+  $path = explode('?', $_SERVER['REQUEST_URI'])[0];
+  //Route by the path within the site, when it is installed in a subdirectory
+  $base = basePath();
+  if ($base != "" && ($path == $base || strpos($path, $base."/") === 0)) {
+    $path = substr($path, strlen($base));
+  }
+  $parts = explode('/', ($path == "") ? "/" : $path);
   switch ($parts[1]) {
     case "api":
       $ret["page_type"] = "api";
@@ -127,14 +133,14 @@ function linkedDataURL($format = "jsonld") {
   $turtle = ($format == "turtle");
   switch ($page["page_type"]) {
     case "home":
-      return(($turtle) ? "/api/cv/?format=ttl" : "/api/cv/");
+      return(sitePath(($turtle) ? "/api/cv/?format=ttl" : "/api/cv/"));
     case "cv":
       if ($page["active_page"] == "") {
         return(null);
       }
-      return("/api/cv/?shortname=".rawurlencode($page["active_page"]).(($turtle) ? "&format=ttl" : ""));
+      return(sitePath("/api/cv/?shortname=".rawurlencode($page["active_page"]).(($turtle) ? "&format=ttl" : "")));
     case "term":
-      return("/api/term/?term=".rawurlencode(siteURL().rawurldecode($page["active_page"]))."&format=".(($turtle) ? "ttl" : "jsonld"));
+      return(sitePath("/api/term/?term=").rawurlencode(siteURL().rawurldecode($page["active_page"]))."&format=".(($turtle) ? "ttl" : "jsonld"));
   }
   return(null);
 }
