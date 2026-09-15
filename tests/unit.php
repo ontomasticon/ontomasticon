@@ -387,3 +387,44 @@ checkSame("configValue() gives an empty string for a setting that isn't there", 
 checkSame("prefixError() accepts a prefix that starts with a letter", null, prefixError("call-type_2"));
 checkSame("and an empty prefix, meaning none", null, prefixError(""));
 check("but refuses others", prefixError("2calls") !== null && prefixError("call type") !== null && prefixError(str_repeat("a", 21)) !== null);
+
+section("Readiness report");
+check("validLanguageTag() accepts en and pt-BR", validLanguageTag("en") && validLanguageTag("pt-BR"));
+check("but not en_GB, an empty language or one with a trailing newline", !validLanguageTag("en_GB") && !validLanguageTag("") && !validLanguageTag("en\n"));
+$readinessTerms = array(
+  testTerm(array("id" => 20, "shortname" => "CallingSong", "name" => "Calling Song", "description" => "Produced by a male.", "cv" => "callType")),
+  testTerm(array("id" => 21, "shortname" => "PrematingSong", "name" => "Premating Song", "description" => "<p></p>", "cv" => "callType")),
+  testTerm(array("id" => 22, "shortname" => "Canto", "name" => "Canto", "description" => "A song.", "language" => "pt_BR", "cv" => "callType")),
+  testTerm(array("id" => 23, "shortname" => "odd term", "name" => "Odd term", "description" => "Saved before short names were checked.")),
+  testTerm(array("id" => 24, "shortname" => "api", "name" => "API", "description" => "Uses the address of the API.")),
+  testTerm(array("id" => 25, "shortname" => "AgreementSong", "name" => "Agreement Song", "description" => "The female\x92s response.", "cv" => "callType")),
+  testTerm(array("id" => 26, "shortname" => "AttractionSong", "name" => "Attraction Song", "description" => "A synonym.", "cv" => "callType", "invalid_reason" => "Synonym")),
+  testTerm(array("id" => 27, "shortname" => "unnamed", "description" => "No name.", "cv" => "callType"))
+);
+$readinessVocabularies = array(
+  "callType" => array("shortname" => "callType", "name" => "Type of Call", "prefix" => null),
+  "unnamedcv" => array("shortname" => "unnamedcv", "name" => "", "prefix" => "unnamed")
+);
+$readiness = readinessIssues($readinessTerms, $readinessVocabularies, array("license" => "", "prefix" => ""));
+$issues = array();
+foreach ($readiness as $issue) {
+  $issues[$issue["id"]] = array_column($issue["items"], "label");
+}
+checkSame("lists each kind of problem once, always in the same order",
+  array("license", "prefix", "vocabulary-name", "term-name", "definition", "language", "shortname", "uri-clash", "utf8", "synonym"), array_keys($issues));
+checkSame("reports a missing license", array("Site configuration"), $issues["license"]);
+checkSame("the site's own terms and vocabularies without a namespace prefix", array("Terms that aren't in a controlled vocabulary", "callType"), $issues["prefix"]);
+checkSame("a vocabulary without a name", array("unnamedcv"), $issues["vocabulary-name"]);
+checkSame("a term without a name", array("callType: unnamed"), $issues["term-name"]);
+checkSame("a term whose definition is empty once its HTML is removed", array("callType: PrematingSong"), $issues["definition"]);
+checkSame("a language that isn't a valid language tag", array("callType: Canto"), $issues["language"]);
+checkSame("a short name saved before short names were checked", array("odd term"), $issues["shortname"]);
+checkSame("a URI that clashes with the site's own addresses", array("api"), $issues["uri-clash"]);
+checkSame("text that isn't valid UTF-8", array("callType: AgreementSong"), $issues["utf8"]);
+checkSame("and a synonym without a parent term", array("callType: AttractionSong"), $issues["synonym"]);
+check("a term with no problems isn't listed", !in_array("callType: CallingSong", call_user_func_array("array_merge", array_values($issues))));
+checkSame("links each term to its edit page", array("label" => "callType: PrematingSong", "link" => "/admin/term/edit/PrematingSong"), $readiness[4]["items"][0]);
+checkSame("and each vocabulary to its edit page", array("label" => "callType", "link" => "/admin/cv/edit/callType"), $readiness[1]["items"][1]);
+checkSame("a site with nothing to fix has no problems", array(), readinessIssues(array($readinessTerms[0]),
+  array("callType" => array("shortname" => "callType", "name" => "Type of Call", "prefix" => "calltype")),
+  array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "")));

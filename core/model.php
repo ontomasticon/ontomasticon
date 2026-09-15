@@ -50,6 +50,11 @@ class Term {
     return(Term::loadOne("`id` = ?", array($id)));
   }
 
+  //Every term, in and outside vocabularies, including deprecated ones
+  public static function all() {
+    return(Term::loadAll("1 = 1", array()));
+  }
+
   //The term a URI identifies, or NULL if it isn't exactly the URI of a term. The URI ends
   //with the term's shortname, or its id if the term is opaque.
   public static function findByURI($uri) {
