@@ -177,6 +177,8 @@ $term = json_decode($body, TRUE);
 checkSame("finds an opaque term from the id in its URL", "opaque_term", is_array($term) ? $term["shortname"] : null);
 list(, , $body) = httpRequest("GET", "/api/term/?term=".rawurlencode("https://glossary.example.org/1"));
 checkSame("doesn't find a term that isn't opaque by its id", "null", $body);
+list(, , $body) = httpRequest("GET", "/api/term/?term=".rawurlencode("https://elsewhere.example.org/acoustic_allometry"));
+checkSame("or a term from an address on another site that ends with its short name", "null", $body);
 $db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `description`, `language`, `opaque`) VALUES ('agreement_song', 'Agreement song', 'The female’s response', 'en', 0);");
 list(, , $body) = httpRequest("GET", "/api/term/?shortname=agreement_song");
 $term = json_decode($body, TRUE);
@@ -198,6 +200,11 @@ section("HTTP: vocabularies");
 $db->query("INSERT INTO ".table("cv")." (`shortname`, `name`, `description`, `reference`) VALUES ('calls', 'Calls', '<p>Types of call.</p>', '');");
 $db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('calling_song', 'Calling song', 'en', 0, 'calls');");
 $db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`, `broader`) SELECT 'rivalry_call', 'Rivalry call', 'en', 0, 'calls', `id` FROM ".table("terms")." WHERE `shortname` = 'calling_song';");
+list(, , $body) = httpRequest("GET", "/api/term/?term=".rawurlencode("https://glossary.example.org/cv/calls#calling_song"));
+$term = json_decode($body, TRUE);
+checkSame("the term API finds a term in a vocabulary from its URI", "calling_song", is_array($term) ? $term["shortname"] : null);
+list(, , $body) = httpRequest("GET", "/api/term/?term=".rawurlencode("https://glossary.example.org/calling_song"));
+checkSame("but not from an address outside the vocabulary", "null", $body);
 list($status, $headers, $body) = httpRequest("GET", "/api/cv/?shortname=calls");
 $ld = json_decode($body, TRUE);
 $graph = (is_array($ld) && isset($ld["@graph"])) ? $ld["@graph"] : array(array("@id" => null, "@type" => null));
@@ -513,6 +520,12 @@ check("a term's URI includes the subdirectory, and is found there",
 list($status, , $body) = httpRequest("GET", "/sub/acoustic_allometry");
 check("its page is there too, with the subdirectory in its canonical address",
   $status == 200 && strpos($body, '<link rel="canonical" href="https://glossary.example.org/sub/acoustic_allometry" />') !== FALSE);
+preg_match('#<link rel="alternate" type="application/ld\+json" href="([^"]+)"#', $body, $jsonLDLink);
+preg_match('#<link rel="alternate" type="text/turtle" href="([^"]+)"#', $body, $turtleLink);
+$concept = isset($jsonLDLink[1]) ? json_decode(httpRequest("GET", html_entity_decode($jsonLDLink[1]))[2], TRUE) : null;
+check("and its link to its JSON-LD finds the term", is_array($concept) && $concept["@id"] === "https://glossary.example.org/sub/acoustic_allometry");
+list($status, , $body) = isset($turtleLink[1]) ? httpRequest("GET", html_entity_decode($turtleLink[1])) : array(0, array(), "");
+check("as does its link to its Turtle", $status == 200 && strpos($body, "<https://glossary.example.org/sub/acoustic_allometry> a skos:Concept") !== FALSE);
 list(, , $body) = httpRequest("GET", "/sub/robots.txt");
 check("robots.txt and the sitemap use the subdirectory",
   strpos($body, "Disallow: /sub/admin/\n") !== FALSE && strpos($body, "Sitemap: https://glossary.example.org/sub/sitemap.xml") !== FALSE);
