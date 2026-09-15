@@ -307,6 +307,13 @@ list($status, , $body) = httpRequest("GET", "/sub/acoustic_allometry", null, $as
 $concept = json_decode($body, TRUE);
 check("a term's URI includes the subdirectory, and is found there",
   $status == 200 && is_array($concept) && $concept["@id"] === "https://glossary.example.org/sub/acoustic_allometry");
+list(, , $body) = httpRequest("GET", "/sub/user/login");
+preg_match("/name='csrf_token' value='([0-9a-f]{64})'/", $body, $matches);
+check("the login form posts back to the subdirectory", strpos($body, '<form action="/sub/user/login"') !== FALSE);
+httpRequest("POST", "/sub/user/login", array("csrf_token" => isset($matches[1]) ? $matches[1] : "", "email" => "admin", "password" => "n3w-secret", "submit" => ""));
+list(, , $body) = httpRequest("GET", "/sub/admin/readiness");
+check("logging in works in the subdirectory, and the readiness report links there",
+  strpos($body, "<a href='/sub/admin/readiness'>") !== FALSE && strpos($body, "<a href='/sub/admin/term/edit/acoustic_allometry'>acoustic_allometry</a>") !== FALSE);
 $db->query("UPDATE `config` SET `value` = 'glossary.example.org/' WHERE `key` = 'base_url';");
 
 proc_terminate($server);
