@@ -78,6 +78,7 @@ if (isset($_SESSION["user"]) && !empty($_SESSION["must_change_password"])) {
   }
 }
 
+rememberLanguage();
 $GLOBALS["ontomasticon"]["language"] = detectLanguage();
 $GLOBALS["ontomasticon"]["cv_count"] = CVcount($db);
 $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
@@ -101,5 +102,7 @@ switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
     print "pong";
     break;
   default:
+    //Pages are shown in the language the browser prefers, unless one has been chosen
+    header("Vary: Accept-Language", FALSE);
     template("core.php");
 }

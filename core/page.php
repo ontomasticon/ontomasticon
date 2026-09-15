@@ -90,6 +90,24 @@ function formatParameter() {
   return(null);
 }
 
+//The items of an Accept or Accept-Language header, in the order given, each as array(value, quality):
+//the value in lower case, and the quality given with ;q=, or 1 if there is none
+function headerPreferences($header) {
+  $preferences = array();
+  foreach (explode(",", (string)$header) as $item) {
+    $parameters = explode(";", $item);
+    $q = 1.0;
+    foreach (array_slice($parameters, 1) as $parameter) {
+      $pair = explode("=", $parameter, 2);
+      if (strtolower(trim($pair[0])) == "q" && isset($pair[1])) {
+        $q = (float)trim($pair[1]);
+      }
+    }
+    $preferences[] = array(strtolower(trim($parameters[0])), $q);
+  }
+  return($preferences);
+}
+
 //The format a request asks for: "jsonld" or "turtle" if it gives ?format=jsonld or ?format=ttl, or its
 //Accept header prefers JSON-LD or Turtle to HTML, and otherwise "html". Browsers, and clients that accept
 //HTML as much as RDF, get HTML. JSON-LD is chosen when it is as acceptable as Turtle.
@@ -102,16 +120,7 @@ function requestedFormat() {
   }
   $formats = array("text/html" => "html", "application/xhtml+xml" => "html", "application/ld+json" => "jsonld", "text/turtle" => "turtle");
   $quality = array("html" => -1, "jsonld" => -1, "turtle" => -1);
-  foreach (explode(",", $_SERVER["HTTP_ACCEPT"]) as $range) {
-    $parameters = explode(";", $range);
-    $type = strtolower(trim($parameters[0]));
-    $q = 1.0;
-    foreach (array_slice($parameters, 1) as $parameter) {
-      $pair = explode("=", $parameter, 2);
-      if (strtolower(trim($pair[0])) == "q" && isset($pair[1])) {
-        $q = (float)trim($pair[1]);
-      }
-    }
+  foreach (headerPreferences($_SERVER["HTTP_ACCEPT"]) as list($type, $q)) {
     if (isset($formats[$type])) {
       $quality[$formats[$type]] = max($quality[$formats[$type]], $q);
     }
