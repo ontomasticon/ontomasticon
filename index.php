@@ -83,11 +83,18 @@ $GLOBALS["ontomasticon"]["language"] = detectLanguage();
 $GLOBALS["ontomasticon"]["cv_count"] = CVcount($db);
 $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
 
+// The API and linked data are public, so scripts on other websites may read them, for example to show a term's
+// definition. Browsers don't send cookies with requests allowed by "*", so no visitor's login is shared.
+if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "api") {
+  header("Access-Control-Allow-Origin: *");
+}
+
 // The site's own addresses also identify its vocabularies and terms. Clients that ask for
 // JSON-LD or Turtle (see requestedFormat()) get that there instead of the HTML page.
 if (in_array($GLOBALS["ontomasticon"]["pageInfo"]["page_type"], array("home", "cv", "term"))) {
   header("Vary: Accept", FALSE);
   if (requestedFormat() != "html") {
+    header("Access-Control-Allow-Origin: *");
     template("linked-data.php");
     exit;
   }

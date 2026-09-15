@@ -164,6 +164,7 @@ section("HTTP: API");
 list($status, $headers, $body) = httpRequest("GET", "/api/term/?shortname=acoustic_allometry");
 $term = json_decode($body, TRUE);
 check("returns JSON", hasHeader($headers, '#^Content-Type: application/json#i'));
+check("that scripts on other websites may read", hasHeader($headers, '/^Access-Control-Allow-Origin: \*$/i'));
 checkSame("returns the term with values as strings", "1", is_array($term) ? $term["id"] : null);
 checkSame("includes the term's URL", "https://glossary.example.org/acoustic_allometry", is_array($term) ? $term["url"] : null);
 list(, , $body) = httpRequest("GET", "/api/term/?shortname=missing");
@@ -231,8 +232,10 @@ $concept = json_decode($body, TRUE);
 check("a term's address returns JSON-LD to a client that asks for it", $status == 200 && hasHeader($headers, '#^Content-Type: application/ld\+json#i'));
 checkSame("describing the term", "https://glossary.example.org/acoustic_allometry", is_array($concept) ? $concept["@id"] : null);
 check("and says the response depends on the Accept header", hasHeader($headers, '/^Vary: .*Accept/i'));
+check("which scripts on other websites may read", hasHeader($headers, '/^Access-Control-Allow-Origin: \*$/i'));
 list($status, $headers, $body) = httpRequest("GET", "/acoustic_allometry");
 check("browsers still get the HTML page there", $status == 200 && hasHeader($headers, '#^Content-Type: text/html#i') && strpos($body, "</head>") !== FALSE);
+check("which isn't opened to other websites' scripts", !hasHeader($headers, '/^Access-Control-Allow-Origin:/i'));
 check("which also varies by Accept header", hasHeader($headers, '/^Vary: .*Accept/i'));
 check("and links to the term's JSON-LD",
   strpos($body, '<link rel="alternate" type="application/ld+json" href="/api/term/?term=https%3A%2F%2Fglossary.example.org%2Facoustic_allometry&amp;format=jsonld"') !== FALSE);
@@ -322,6 +325,7 @@ checkSame("of terms whose names contain the search, in and out of vocabularies",
   array(array("agreement_song", "https://glossary.example.org/agreement_song", null), array("calling_song", "https://glossary.example.org/cv/calls#calling_song", "Calls")),
   is_array($suggestions) ? array_map(function($s) { return(array($s["shortname"], $s["uri"], $s["vocabulary"])); }, $suggestions) : null);
 check("which may be kept, as they don't start a session", !hasHeader($headers, '/^Set-Cookie:/i') && hasHeader($headers, '/^Cache-Control: public/i'));
+check("and which other websites may use to suggest terms", hasHeader($headers, '/^Access-Control-Allow-Origin: \*$/i'));
 list(, , $body) = httpRequest("GET", "/api/search/");
 checkSame("an empty search suggests nothing", "[]", $body);
 list($status, , $body) = httpRequest("GET", "/?q=female");
@@ -401,6 +405,7 @@ check("and JSON-LD when both are equally acceptable", hasHeader($headers, '#^Con
 list($status, $headers, $body) = httpRequest("GET", "/no_such_term", null, $asTurtle);
 check("an unknown term is not found, with an empty Turtle document",
   $status == 404 && hasHeader($headers, '#^Content-Type: text/turtle#i') && $body === "");
+check("which other websites' scripts may still read, to learn it isn't there", hasHeader($headers, '/^Access-Control-Allow-Origin: \*$/i'));
 list($status, $headers, $body) = httpRequest("GET", "/api/term/?shortname=agreement_song&format=ttl");
 check("the term API returns Turtle with format=ttl", $status == 200 && hasHeader($headers, '#^Content-Type: text/turtle#i')
   && strpos($body, 'rdfs:comment "The female’s response"@en') !== FALSE);
