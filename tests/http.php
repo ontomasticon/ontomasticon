@@ -390,6 +390,18 @@ $concept = json_decode($body, TRUE);
 checkSame("and its JSON-LD gives the datatype as its range", array("@id" => "http://www.w3.org/2001/XMLSchema#decimal"),
   (is_array($concept) && isset($concept["rdfs:range"])) ? $concept["rdfs:range"] : null);
 
+section("HTTP: synonyms and deprecated broader terms in a vocabulary");
+$db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`, `parent`, `invalid_reason`) SELECT 'song_call', 'Song call', 'en', 0, 'calls', `id`, 'Synonym' FROM ".table("terms")." WHERE `shortname` = 'calling_song';");
+$synonymRow = "<td class='invalid_reason'>Synonym</td><td class='child_term_name'><a href='https://glossary.example.org/cv/calls#song_call'>Song call</a></td>";
+list(, , $body) = httpRequest("GET", "/cv/calls");
+check("a synonym in a vocabulary has no entry of its own, so its row in its term's entry is at the fragment of its URI",
+  strpos($body, "<tr id='song_call'>".$synonymRow) !== FALSE && substr(term2URI(getTerm("song_call")), -strlen("#song_call")) === "#song_call");
+$db->query("UPDATE ".table("terms")." SET `broader` = ".(int)getTerm("song_call")["id"]." WHERE `shortname` = 'rivalry_call';");
+list(, , $body) = httpRequest("GET", "/cv/calls");
+check("a term's page shows its broader term even when that term is deprecated, as its RDF does", substr_count($body, $synonymRow) == 2);
+$db->query("UPDATE ".table("terms")." SET `broader` = ".(int)getTerm("calling_song")["id"]." WHERE `shortname` = 'rivalry_call';");
+$db->query("DELETE FROM ".table("terms")." WHERE `shortname` = 'song_call';");
+
 section("HTTP: Turtle");
 $asTurtle = array("Accept: text/turtle");
 list($status, $headers, $body) = httpRequest("GET", "/acoustic_allometry", null, $asTurtle);

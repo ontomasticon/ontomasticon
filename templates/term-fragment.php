@@ -46,7 +46,9 @@
       print "</tr>";
     }
     foreach ((is_array($GLOBALS["ontomasticon"]["term"]["children"]) ? $GLOBALS["ontomasticon"]["term"]["children"] : array()) as $child) {
-      print "<tr>";
+      //A synonym in a vocabulary has no entry of its own, so the fragment of its URI is its row here, in the entry of the term it is a synonym of
+      $synonymHere = ($child["invalid_reason"] == "Synonym" && $child["cv"] != "" && $child["cv"] == $GLOBALS["ontomasticon"]["term"]["cv"]);
+      print "<tr".(($synonymHere) ? " id='".h(termAnchor($child))."'" : "").">";
       print "<td class='invalid_reason'>".h(t($child["invalid_reason"]))."</td>";
       print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
       print "<td class='child_term_language'>".h($child["language"])."</td>";

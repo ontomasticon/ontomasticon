@@ -147,7 +147,7 @@ function getTermForPage($id) {
 
 //Rows of the terms table, each with the terms related to it for showing on a page: "children" (terms it is the parent
 //of), "parent_term" (its parent term as a list, so a synonym shows the term it is a synonym of), "narrower" (valid terms
-//it is the broader term of) and "broader" (its broader term as a list, if it is valid).
+//it is the broader term of) and "broader" (its broader term as a list, even if it is deprecated, as in RDF).
 //The related terms of the whole list are fetched at once, rather than for each term.
 function withTermRelations($ret) {
   $ids = array_column($ret, "id");
@@ -167,7 +167,7 @@ function withTermRelations($ret) {
   $children = termsGroupedBy("parent", "SELECT * FROM ".table("terms")." WHERE `parent` IN (%s) ORDER BY `invalid_reason`;", $ids);
   $parents  = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s);", $parentIds);
   $narrower = termsGroupedBy("broader", "SELECT * FROM ".table("terms")." WHERE `broader` IN (%s) AND `invalid_reason` IS NULL ORDER BY `shortname`;", $ids);
-  $broader  = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s) AND `invalid_reason` IS NULL;", $broaderIds);
+  $broader  = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s);", $broaderIds);
 
   $out = array();
   foreach ($ret as $row) {
