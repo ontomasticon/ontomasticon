@@ -3,7 +3,7 @@
 // Department of Information Retrieval
 
 //Codebase version. Installs before 0.3 can only read an unquoted number here when checking for updates.
-$version = 0.3;
+$version = 0.4;
 
 //Query results are checked where they are used, so stop mysqli throwing exceptions (the default from PHP 8.1)
 mysqli_report(MYSQLI_REPORT_OFF);

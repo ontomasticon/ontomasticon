@@ -350,3 +350,40 @@ $turtle = turtleOutput(vocabularyJSONLD($callType, array($premating, $song, $syn
 checkSame("writes a vocabulary as its scheme followed by each of its terms", 5, preg_match_all('/^</m', $turtle));
 check("starting with the scheme", strpos($turtle, "\n<https://glossary.example.org/cv/callType> a skos:ConceptScheme ;\n") !== FALSE);
 check("with the same values as the JSON-LD", strpos($turtle, '    skos:definition "The female’s response."@en ;') !== FALSE);
+
+section("Dates and publishing settings");
+checkSame("a database date and time gives an xsd:date", array("@value" => "2026-09-14", "@type" => "xsd:date"), jsonLDDate("2026-09-14 16:05:00"));
+checkSame("no date gives nothing", null, jsonLDDate(null));
+checkSame("nor does MariaDB's zero date", null, jsonLDDate("0000-00-00 00:00:00"));
+$ld = termJSONLD(testTerm(array("id" => 6, "shortname" => "dated", "name" => "Dated",
+  "created" => "2020-01-01 09:00:00", "modified" => "2026-09-14 16:05:00")));
+checkSame("gives when a term was created and last modified",
+  array(array("@value" => "2020-01-01", "@type" => "xsd:date"), array("@value" => "2026-09-14", "@type" => "xsd:date")),
+  array($ld["dcterms:created"], $ld["dcterms:modified"]));
+check("a term without dates has none", !isset(termJSONLD($premating)["dcterms:created"]) && !isset(termJSONLD($premating)["dcterms:modified"]));
+$turtle = turtleOutput($ld);
+check("Turtle writes the dates as typed values", preg_match('/^    dcterms:modified "2026-09-14"\^\^xsd:date [;.]$/m', $turtle) === 1);
+check("with the xsd prefix declared", strpos($turtle, "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n") !== FALSE);
+
+$GLOBALS["ontomasticon"]["config"]["publisher"] = "Natural History Museum";
+$GLOBALS["ontomasticon"]["config"]["license"] = "https://creativecommons.org/licenses/by/4.0/";
+$GLOBALS["ontomasticon"]["config"]["prefix"] = "gl";
+$callType = new Vocabulary("callType");
+$callType->prefix = "calltype";
+$scheme = vocabularyJSONLD($callType, array())["@graph"][0];
+checkSame("a vocabulary's scheme gives the site's publisher", "Natural History Museum", $scheme["dcterms:publisher"]);
+checkSame("and license", array("@id" => "https://creativecommons.org/licenses/by/4.0/"), $scheme["dcterms:license"]);
+checkSame("and the vocabulary's namespace prefix and URI", array("calltype", "https://glossary.example.org/cv/callType#"),
+  array($scheme["vann:preferredNamespacePrefix"], $scheme["vann:preferredNamespaceUri"]));
+$scheme = vocabularyJSONLD(Vocabulary::site(), array())["@graph"][0];
+checkSame("the site's own scheme uses the site's prefix, with the site address as its namespace", array("gl", "https://glossary.example.org/"),
+  array($scheme["vann:preferredNamespacePrefix"], $scheme["vann:preferredNamespaceUri"]));
+$GLOBALS["ontomasticon"]["config"]["license"] = "CC BY 4.0";
+$scheme = vocabularyJSONLD(new Vocabulary("callType"), array())["@graph"][0];
+check("a license that isn't a web address is left out", !isset($scheme["dcterms:license"]));
+check("and a vocabulary without a prefix has no namespace", !isset($scheme["vann:preferredNamespacePrefix"]) && !isset($scheme["vann:preferredNamespaceUri"]));
+unset($GLOBALS["ontomasticon"]["config"]["publisher"], $GLOBALS["ontomasticon"]["config"]["license"], $GLOBALS["ontomasticon"]["config"]["prefix"]);
+checkSame("configValue() gives an empty string for a setting that isn't there", "", configValue("publisher"));
+checkSame("prefixError() accepts a prefix that starts with a letter", null, prefixError("call-type_2"));
+checkSame("and an empty prefix, meaning none", null, prefixError(""));
+check("but refuses others", prefixError("2calls") !== null && prefixError("call type") !== null && prefixError(str_repeat("a", 21)) !== null);

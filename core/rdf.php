@@ -48,13 +48,17 @@ function turtleOutput($data) {
   return($out);
 }
 
-//A JSON-LD value (a string, a boolean, or an array with @id, or with @value and @language) in Turtle
+//A JSON-LD value (a string, a boolean, or an array with @id, or with @value and either @type or @language) in Turtle
 function turtleValue($value) {
   if (is_bool($value)) {
     return(($value) ? "true" : "false");
   }
   if (is_array($value) && isset($value["@id"])) {
     return(turtleIRI($value["@id"]));
+  }
+  if (is_array($value) && isset($value["@type"])) {
+    //Datatypes are prefixed names, such as xsd:date
+    return(turtleString($value["@value"])."^^".$value["@type"]);
   }
   if (is_array($value)) {
     return(turtleString($value["@value"]).(isset($value["@language"]) ? "@".$value["@language"] : ""));

@@ -18,6 +18,11 @@ if (!userAllow("administer")) {
     <input type="text" id="author" name="author"
            value="<?php print h($GLOBALS["ontomasticon"]["config"]["author"]);?>"
            placeholder=""><br/><br/>
+    <label for="publisher"><?php print t("Publisher"); ?></label><br/>
+    <small><?php print t("The organisation that publishes the vocabularies, if there is one"); ?></small><br/>
+    <input type="text" id="publisher" name="publisher"
+           value="<?php print h(configValue("publisher"));?>"
+           placeholder=""><br/><br/>
     <label for="default_lang"><?php print t("Default language"); ?></label><br/>
     <input type="text" id="default_lang" name="default_lang"
            value="<?php print h($GLOBALS["ontomasticon"]["config"]["default_lang"]);?>"
@@ -29,6 +34,16 @@ if (!userAllow("administer")) {
            placeholder=""><br/><br/>
     <label for="description"><?php print t("Description"); ?></label><br/>
     <textarea id="description" name="description" rows="4" cols="50"><?php print h($GLOBALS["ontomasticon"]["config"]["description"]);?></textarea><br/><br/>
+    <label for="license"><?php print t("License"); ?></label><br/>
+    <small><?php print t("The web address of the license the vocabularies are published under, for example https://creativecommons.org/licenses/by/4.0/"); ?></small><br/>
+    <input type="text" id="license" name="license"
+           value="<?php print h(configValue("license"));?>"
+           placeholder=""><br/><br/>
+    <label for="prefix"><?php print t("Namespace prefix"); ?></label><br/>
+    <small><?php print t("A short prefix for the terms that aren't in a controlled vocabulary, used in RDF, for example gl"); ?></small><br/>
+    <input type="text" id="prefix" name="prefix"
+           value="<?php print h(configValue("prefix"));?>"
+           placeholder=""><br/><br/>
     <button type="submit" name="submit"><?php print t("Save"); ?></button>
   </form>
 <?php

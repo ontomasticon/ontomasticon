@@ -38,6 +38,12 @@ if (!userAllow("edit-cvs")) {
            value="<?php print htmlspecialchars($GLOBALS["ontomasticon"]["CVs"][$CV]["reference"]); ?>"
            placeholder="">
            <br/><br/>
+    <label for="prefix"><?php print t("Namespace prefix"); ?></label><br/>
+    <small><?php print t("A short prefix for the vocabulary's terms, used in RDF, for example calltype"); ?></small><br/>
+    <input type="text" id="prefix" name="prefix"
+           value="<?php print h(isset($GLOBALS["ontomasticon"]["CVs"][$CV]["prefix"]) ? $GLOBALS["ontomasticon"]["CVs"][$CV]["prefix"] : ""); ?>"
+           placeholder="">
+           <br/><br/>
     <button type="submit" name="submit"><?php print t("Save"); ?></button>
     <?php if (userAllow("delete-cv")) { ?>
     <button type="submit" name="delete"><?php print t("Delete"); ?></button>
