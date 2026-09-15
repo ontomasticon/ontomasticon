@@ -28,6 +28,20 @@ function validUTF8($text) {
   return(htmlspecialchars_decode(htmlspecialchars((string)$text, ENT_NOQUOTES | ENT_SUBSTITUTE, "UTF-8"), ENT_NOQUOTES));
 }
 
+//Text of at most $length characters: cut at the last space that fits, or at $length if there is none, and ending
+//with an ellipsis when anything was cut
+function shortText($text, $length) {
+  $text = validUTF8($text);
+  if (preg_match('/^.{0,'.(int)$length.'}$/us', $text) === 1) {
+    return($text);
+  }
+  if (preg_match('/^(.{1,'.((int)$length - 1).'})\s/us', $text, $matches) !== 1) {
+    preg_match('/^.{'.((int)$length - 1).'}/us', $text, $matches);
+    $matches[1] = $matches[0];
+  }
+  return(rtrim($matches[1])."…");
+}
+
 //Escaped address for a form that posts back to the current page. Uses the address
 //the visitor requested, as PHP_SELF is /index.php under most rewrite configurations.
 function formAction() {

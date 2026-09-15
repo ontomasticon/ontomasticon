@@ -224,6 +224,41 @@ check("a browser's Accept header gets the vocabulary page", hasHeader($headers, 
 list(, , $body) = httpRequest("GET", "/ping", null, $asJSONLD);
 checkSame("other addresses aren't affected", "pong", $body);
 
+section("HTTP: term pages and addresses that aren't found");
+list($status, , $body) = httpRequest("GET", "/acoustic_allometry");
+check("a term's address is a page for that term alone",
+  $status == 200 && strpos($body, 'id="acoustic_allometry"') !== FALSE && strpos($body, 'id="agreement_song"') === FALSE);
+check("titled with the term's name, then the site's", strpos($body, "<title>Acoustic allometry – Site name.</title>") !== FALSE);
+check("with the term's URI as its canonical address", strpos($body, '<link rel="canonical" href="https://glossary.example.org/acoustic_allometry" />') !== FALSE);
+check("and a link to all the terms", strpos($body, "<a href='/'>All terms</a>") !== FALSE);
+list(, , $body) = httpRequest("GET", "/2");
+check("an opaque term's page is at its id", strpos($body, 'id="2"') !== FALSE && strpos($body, "<title>Opaque term – Site name.</title>") !== FALSE);
+list($status, , $body) = httpRequest("GET", "/no_such_term");
+checkSame("an address with no term is not found", 404, $status);
+check("but its page says so and still lists the site's terms",
+  strpos($body, "There is no term at this address") !== FALSE && strpos($body, 'id="acoustic_allometry"') !== FALSE);
+check("without a canonical address or links to RDF", strpos($body, 'rel="canonical"') === FALSE && strpos($body, 'rel="alternate"') === FALSE);
+list($status, , $body) = httpRequest("GET", "/cv/nonexistent");
+check("an address with no vocabulary is not found, and lists the vocabularies", $status == 404 && strpos($body, "Controlled Vocabularies") !== FALSE);
+list(, , $body) = httpRequest("GET", "/cv/calls");
+check("a vocabulary's page is titled with its name and has its URI as its canonical address",
+  strpos($body, "<title>Calls – Site name.</title>") !== FALSE && strpos($body, '<link rel="canonical" href="https://glossary.example.org/cv/calls" />') !== FALSE);
+list(, , $body) = httpRequest("GET", "/");
+check("the home page's canonical address is the site's", strpos($body, '<link rel="canonical" href="https://glossary.example.org/" />') !== FALSE);
+check("and the logo has empty alternative text, as it is decorative", preg_match('/<img[^>]+id="logo" alt=""/', $body) === 1);
+list($status, $headers, $body) = httpRequest("GET", "/robots.txt");
+check("robots.txt keeps crawlers out of the administration and user pages", $status == 200 && hasHeader($headers, '#^Content-Type: text/plain#i')
+  && strpos($body, "Disallow: /admin/\n") !== FALSE && strpos($body, "Disallow: /user/\n") !== FALSE);
+check("and points to the sitemap", strpos($body, "Sitemap: https://glossary.example.org/sitemap.xml") !== FALSE);
+list($status, $headers, $body) = httpRequest("GET", "/sitemap.xml");
+check("the sitemap is XML", $status == 200 && hasHeader($headers, '#^Content-Type: application/xml#i')
+  && strpos($body, '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">') !== FALSE);
+check("listing the home page, each vocabulary's page and each term's page", strpos($body, "<loc>https://glossary.example.org/</loc>") !== FALSE
+  && strpos($body, "<loc>https://glossary.example.org/cv/calls</loc>") !== FALSE && strpos($body, "<loc>https://glossary.example.org/acoustic_allometry</loc>") !== FALSE);
+check("but not terms in a vocabulary, which are on its page", strpos($body, "calling_song") === FALSE);
+list($status, $headers) = httpRequest("GET", "/favicon.ico");
+check("favicon.ico is the site's icon", $status == 200 && hasHeader($headers, '#^Content-Type: image/png#i'));
+
 section("HTTP: term types");
 $db->query("UPDATE ".table("terms")." SET `type` = 'property' WHERE `shortname` = 'agreement_song';");
 list(, , $body) = httpRequest("GET", "/");
@@ -343,6 +378,12 @@ list($status, , $body) = httpRequest("GET", "/sub/acoustic_allometry", null, $as
 $concept = json_decode($body, TRUE);
 check("a term's URI includes the subdirectory, and is found there",
   $status == 200 && is_array($concept) && $concept["@id"] === "https://glossary.example.org/sub/acoustic_allometry");
+list($status, , $body) = httpRequest("GET", "/sub/acoustic_allometry");
+check("its page is there too, with the subdirectory in its canonical address",
+  $status == 200 && strpos($body, '<link rel="canonical" href="https://glossary.example.org/sub/acoustic_allometry" />') !== FALSE);
+list(, , $body) = httpRequest("GET", "/sub/robots.txt");
+check("robots.txt and the sitemap use the subdirectory",
+  strpos($body, "Disallow: /sub/admin/\n") !== FALSE && strpos($body, "Sitemap: https://glossary.example.org/sub/sitemap.xml") !== FALSE);
 list(, , $body) = httpRequest("GET", "/sub/user/login");
 preg_match("/name='csrf_token' value='([0-9a-f]{64})'/", $body, $matches);
 check("the login form posts back to the subdirectory", strpos($body, '<form action="/sub/user/login"') !== FALSE);

@@ -113,6 +113,8 @@ checkSame("API endpoint", array("page_type" => "api", "active_page" => "term"), 
 checkSame("other files in settings/ go to the home page", array("page_type" => "home"), routeFor("/settings/db.php"));
 checkSame("a term's own address, ignoring the query string",
   array("page_type" => "term", "active_page" => "acoustic_allometry"), routeFor("/acoustic_allometry?lang=fr"));
+checkSame("robots.txt, sitemap.xml and favicon.ico, which index.php makes", array("robots.txt", "sitemap.xml", "favicon.ico"),
+  array(routeFor("/robots.txt")["page_type"], routeFor("/sitemap.xml")["page_type"], routeFor("/favicon.ico")["page_type"]));
 $routedElsewhere = array_values(array_filter(reservedRouteSegments(), function($segment) {
   return(routeFor("/".$segment."/")["page_type"] != "term");
 }));
@@ -169,6 +171,39 @@ checkSame("a term's address links to the term", "/api/term/?term=https%3A%2F%2Fg
   linkedDataFor(array("page_type" => "term", "active_page" => "acoustic_allometry")));
 checkSame("other pages have no JSON-LD", null, linkedDataFor(array("page_type" => "admin", "active_page" => "config")));
 unset($GLOBALS["ontomasticon"]["pageInfo"]);
+
+section("Page titles, descriptions and canonical addresses");
+checkSame("shortText() leaves short text alone", "A short definition.", shortText("A short definition.", 30));
+checkSame("and cuts long text at the last space that fits, with an ellipsis", "The principle of acoustic…", shortText("The principle of acoustic allometry", 30));
+checkSame("or at the length when there is no space", "abcdefghi…", shortText("abcdefghijklmnop", 10));
+checkSame("counting characters rather than bytes", "Café…", shortText("Café crème brûlée", 6));
+$GLOBALS["ontomasticon"]["config"]["site_name"] = "Bioacoustics Glossary";
+$GLOBALS["ontomasticon"]["config"]["description"] = "Terms used in <i>bioacoustics</i>.";
+$GLOBALS["ontomasticon"]["CVs"] = array("calls" => array("shortname" => "calls", "name" => "Calls", "description" => "<p>Types of call.</p>"));
+function pageFor($pageInfo, $term = null) {
+  $GLOBALS["ontomasticon"]["pageInfo"] = $pageInfo;
+  $GLOBALS["ontomasticon"]["pageTerm"] = $term;
+  return(array("title" => pageTitle(), "description" => pageDescription(), "canonical" => canonicalURL(), "notFound" => pageNotFound()));
+}
+$allometry = array("id" => 1, "shortname" => "acoustic_allometry", "name" => "acoustic allometry", "cv" => null, "opaque" => 0,
+  "description" => "<p>The larger the animal, the lower its calls.</p>");
+checkSame("a term's page is titled and described by the term, with its URI as the canonical address", array(
+  "title" => "acoustic allometry – Bioacoustics Glossary", "description" => "The larger the animal, the lower its calls.",
+  "canonical" => "https://glossary.example.org/acoustic_allometry", "notFound" => FALSE
+), pageFor(array("page_type" => "term", "active_page" => "acoustic_allometry"), $allometry));
+checkSame("an address with no term is not found, and has the site's title and description but no canonical address", array(
+  "title" => "Bioacoustics Glossary", "description" => "Terms used in bioacoustics.", "canonical" => null, "notFound" => TRUE
+), pageFor(array("page_type" => "term", "active_page" => "no_such_term")));
+checkSame("a vocabulary's page is titled and described by the vocabulary", array(
+  "title" => "Calls – Bioacoustics Glossary", "description" => "Types of call.", "canonical" => "https://glossary.example.org/cv/calls", "notFound" => FALSE
+), pageFor(array("page_type" => "cv", "active_page" => "calls")));
+checkSame("an address with no vocabulary is not found", TRUE, pageFor(array("page_type" => "cv", "active_page" => "medium"))["notFound"]);
+checkSame("the list of vocabularies is found, but has no canonical address", array(FALSE, null),
+  array(pageFor(array("page_type" => "cv", "active_page" => ""))["notFound"], pageFor(array("page_type" => "cv", "active_page" => ""))["canonical"]));
+checkSame("the home page's canonical address is the site's", "https://glossary.example.org/", pageFor(array("page_type" => "home"))["canonical"]);
+check("robots.txt, sitemap.xml and favicon.ico are reserved short names",
+  reservedTermShortname("robots.txt") && reservedTermShortname("sitemap.xml") && reservedTermShortname("favicon.ico"));
+unset($GLOBALS["ontomasticon"]["pageInfo"], $GLOBALS["ontomasticon"]["pageTerm"], $GLOBALS["ontomasticon"]["CVs"]);
 
 section("Languages");
 $_GET = array("lang" => "jibberish");
