@@ -2,7 +2,7 @@
   <?php
   $links = array();
   if (userAllow("administer")) {
-    $links[] = l("Configure site", "/admin/configure");
+    $links[] = l("Configure site", "/admin/config");
   }
   if (userAllow("manage-users")) {
     $links[] = l("Users", "/admin/users");

@@ -8,7 +8,7 @@ if (!userAllow("edit-terms")) {
     addTerm();
   }
   ?>
-  <h3><?php print t("Add term"); ?></i></h3>
+  <h3><?php print t("Add term"); ?></h3>
   <form action="<?php print formAction(); ?>" method="post"><?php print csrfField(); ?>
     <label for="shortname"><?php print t("Shortname"); ?></label><br/>
     <input type="text" id="shortname" name="shortname"

@@ -282,6 +282,7 @@ check("changes the password", strpos($body, "Saved.") !== FALSE);
 list($status, , $body) = httpRequest("GET", "/admin/config");
 checkSame("admin pages open once the password is changed", 200, $status);
 check("admin forms post back to the requested address", strpos($body, '<form action="/admin/config"') !== FALSE);
+check("the admin menu links to the configuration page", strpos($body, "<a href='/admin/config'>Configure site</a>") !== FALSE);
 check("the configuration form has the publishing settings",
   strpos($body, 'name="publisher"') !== FALSE && strpos($body, 'name="license"') !== FALSE && strpos($body, 'name="prefix"') !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/config", array(
@@ -300,6 +301,11 @@ check("and lists terms without a definition, linking to where they can be edited
   strpos($body, "<h3 id='definition'>") !== FALSE && strpos($body, "<a href='/admin/term/edit/acoustic_allometry'>acoustic_allometry</a>") !== FALSE);
 check("but not the license, which is now set", strpos($body, "<h3 id='license'>") === FALSE);
 check("the administration menu links to it", strpos($body, "<a href='/admin/readiness'>") !== FALSE);
+list(, , $body) = httpRequest("GET", "/admin/term/add");
+check("the add term page has a well-formed heading", strpos($body, "<h3>Add term</h3>") !== FALSE);
+list(, , $body) = httpRequest("POST", "/admin/term/edit/acoustic_allometry", array("csrf_token" => $token, "delete" => ""));
+check("deleting a term first asks to confirm deleting that one term",
+  strpos($body, '<button type="submit" name="delete_term">Delete term</button>') !== FALSE && getTerm("acoustic_allometry") !== null);
 
 list(, , $body) = httpRequest("POST", "/user/login", array("csrf_token" => $token, "logout" => ""));
 check("logs out", strpos($body, "Logged out.") !== FALSE);
