@@ -181,9 +181,17 @@ function pageNotFound() {
     || ($page["page_type"] == "cv" && $page["active_page"] != "" && currentPageVocabulary() === null));
 }
 
-//The page's title: the name of the term or vocabulary it is for, if any, then the site's name
+//Whether the current page is the results of a search: the home page with ?q=
+function searchPage() {
+  return($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "home" && searchQuery() !== "");
+}
+
+//The page's title: the search, or the name of the term or vocabulary the page is for, if any, then the site's name
 function pageTitle() {
   $site = tu("site_name");
+  if (searchPage()) {
+    return(t("Search results for")." “".searchQuery()."” – ".$site);
+  }
   $term = currentPageTerm();
   $vocabulary = currentPageVocabulary();
   if ($term !== null && $term["name"] != "") {

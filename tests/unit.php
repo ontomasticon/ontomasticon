@@ -716,3 +716,22 @@ check("links to the letters that have terms", strpos($index, '<a href="#glossary
 check("and shows the others without a link", strpos($index, '<span class="glossary-index-empty">B</span>') !== FALSE && strpos($index, 'href="#glossary:B"') === FALSE);
 checkSame("lists every letter from A to Z", 27, preg_match_all('/>[A-Z#]</', $index));
 check("leaves out # when no term is filed under it", strpos(glossaryIndex(array("A" => array())), "#</") === FALSE);
+
+section("Search");
+checkSame("a search matches text containing it", "%echo%", likePattern("echo"));
+checkSame("or starting with it", "echo%", likePattern("echo", TRUE));
+checkSame("LIKE's wildcards and escape character in a search only match themselves", "%100|% |_||%", likePattern("100% _|"));
+$_GET["q"] = "  echo  ";
+checkSame("the search is read from ?q=, without the spaces around it", "echo", searchQuery());
+$_GET["q"] = str_repeat("é", 150);
+checkSame("and cut to 100 characters, rather than bytes", str_repeat("é", 100), searchQuery());
+$_GET["q"] = array("echo");
+checkSame("a search that isn't text is ignored", "", searchQuery());
+$pageInfo = isset($GLOBALS["ontomasticon"]["pageInfo"]) ? $GLOBALS["ontomasticon"]["pageInfo"] : null;
+$_GET["q"] = "echo";
+$GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "home");
+check("the home page with a search is the search page", searchPage());
+$GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "term", "active_page" => "echo");
+check("other pages aren't, whatever their address has", !searchPage());
+$GLOBALS["ontomasticon"]["pageInfo"] = $pageInfo;
+unset($_GET["q"]);

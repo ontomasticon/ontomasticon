@@ -282,6 +282,33 @@ check("but not terms in a vocabulary, which are on its page", strpos($body, "cal
 list($status, $headers) = httpRequest("GET", "/favicon.ico");
 check("favicon.ico is the site's icon", $status == 200 && hasHeader($headers, '#^Content-Type: image/png#i'));
 
+section("HTTP: search");
+unset($GLOBALS["http_cookie"]);
+list(, , $body) = httpRequest("GET", "/");
+check("pages have a search box that opens the search page", strpos($body, '<form id="term-search" role="search" action="/" method="get"') !== FALSE
+  && strpos($body, 'name="q" value=""') !== FALSE);
+check("with the script that suggests terms, and where to get them", strpos($body, '<script src="/js/search.js" defer></script>') !== FALSE
+  && strpos($body, 'data-suggestions="/api/search/"') !== FALSE);
+list($status) = httpRequest("GET", "/js/search.js");
+checkSame("the script is served directly", 200, $status);
+list($status, $headers, $body) = httpRequest("GET", "/api/search/?q=song");
+$suggestions = json_decode($body, TRUE);
+check("suggestions are JSON", $status == 200 && hasHeader($headers, '#^Content-Type: application/json#i') && is_array($suggestions));
+checkSame("of terms whose names contain the search, in and out of vocabularies",
+  array(array("agreement_song", "https://glossary.example.org/agreement_song", null), array("calling_song", "https://glossary.example.org/cv/calls#calling_song", "Calls")),
+  is_array($suggestions) ? array_map(function($s) { return(array($s["shortname"], $s["uri"], $s["vocabulary"])); }, $suggestions) : null);
+check("which may be kept, as they don't start a session", !hasHeader($headers, '/^Set-Cookie:/i') && hasHeader($headers, '/^Cache-Control: public/i'));
+list(, , $body) = httpRequest("GET", "/api/search/");
+checkSame("an empty search suggests nothing", "[]", $body);
+list($status, , $body) = httpRequest("GET", "/?q=female");
+check("the search page lists the terms matching the search", $status == 200 && strpos($body, 'id="agreement_song"') !== FALSE && strpos($body, 'id="acoustic_allometry"') === FALSE);
+check("titled with the search, and with the search in the box", strpos($body, "<title>Search results for “female” – Site name.</title>") !== FALSE
+  && strpos($body, 'name="q" value="female"') !== FALSE);
+check("kept out of search engines", strpos($body, '<meta name="robots" content="noindex" />') !== FALSE);
+list(, , $body) = httpRequest("GET", "/?q=".rawurlencode("<b>x"));
+check("says when nothing matches, and escapes the search", strpos($body, "No terms match your search.") !== FALSE
+  && strpos($body, "“&lt;b&gt;x”") !== FALSE && strpos($body, "<b>x") === FALSE);
+
 section("HTTP: schema.org");
 //The schema.org data embedded in a page, decoded, or NULL if there is none
 function structuredData($body) {

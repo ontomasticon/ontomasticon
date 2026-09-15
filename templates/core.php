@@ -30,13 +30,33 @@ $structuredData = pageStructuredData();
 if ($structuredData !== null) {
   print schemaOrgScript($structuredData);
 }
+if (searchPage()) {
+  //Search results change as terms are edited, and each search would be a page of its own
+  ?>
+  <meta name="robots" content="noindex" />
+  <?php
+}
 ?>
+<script src="<?php print h(sitePath("/js/search.js")); ?>" defer></script>
 </head>
 
 <body>
 <div id="header">
   <img src="<?php print h(sitePath("/images/ontomasticon.svg")); ?>" id="logo" alt="" />
   <h1 id="site_title"><?php print l(tu("site_name"), "/"); ?></h1>
+  <form id="term-search" role="search" action="<?php print h(sitePath("/")); ?>" method="get"
+        data-suggestions="<?php print h(sitePath("/api/search/")); ?>" data-synonym-of="<?php print h(t("Synonym of")); ?>">
+    <label for="term-search-input" class="visually-hidden"><?php print h(t("Search terms")); ?></label>
+    <input type="search" id="term-search-input" name="q" value="<?php print h(searchPage() ? searchQuery() : ""); ?>"
+           placeholder="<?php print h(t("Search terms")); ?>" autocomplete="off" />
+    <?php
+    //Keep a language chosen with ?lang=, as links do (see l())
+    if (isset($_GET["lang"])) {
+      print '<input type="hidden" name="lang" value="'.h(detectLanguage()).'" />';
+    }
+    ?>
+    <button type="submit"><?php print h(t("Search")); ?></button>
+  </form>
 </div>
 
 <?php
