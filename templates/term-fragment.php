@@ -4,16 +4,16 @@
     print " ";
     print termEditLink($GLOBALS["ontomasticon"]["term"]["shortname"]);
   ?></h3>
-  <p><?php print term2URI($GLOBALS["ontomasticon"]["term"], TRUE); ?></p>
+  <p class="term-uri"><?php print term2URI($GLOBALS["ontomasticon"]["term"], TRUE); ?></p>
   <?php
   //Most terms are concepts, so only other types are shown
   $termType = termType(isset($GLOBALS["ontomasticon"]["term"]["type"]) ? $GLOBALS["ontomasticon"]["term"]["type"] : null);
   if ($termType != "concept") {
-    print '<p class="term_type">'.h(t(termTypeLabels()[$termType])).'</p>';
+    print '<p class="term-type">'.h(t(termTypeLabels()[$termType])).'</p>';
   }
   ?>
-  <p><?php print h($GLOBALS["ontomasticon"]["term"]["language"]); ?></p>
-  <p><?php print $GLOBALS["ontomasticon"]["term"]["description"]; ?></p>
+  <p class="term-language"><?php print h($GLOBALS["ontomasticon"]["term"]["language"]); ?></p>
+  <p class="term-description"><?php print $GLOBALS["ontomasticon"]["term"]["description"]; ?></p>
   <?php
   template("term-fragment-reference.php");
 
@@ -44,7 +44,7 @@
     <?php
     foreach ($GLOBALS["ontomasticon"]["term"]["broader"] as $child) {
       print "<tr>";
-      print "<td class='invalid_reason'>".h($child["invalid_reason"])."</td>";
+      print "<td class='invalid_reason'>".h(t($child["invalid_reason"]))."</td>";
       print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
       print "<td class='child_term_language'>".h($child["language"])."</td>";
       print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";
@@ -64,7 +64,7 @@
     <?php
     foreach ($GLOBALS["ontomasticon"]["term"]["narrower"] as $child) {
       print "<tr>";
-      print "<td class='invalid_reason'>".h($child["invalid_reason"])."</td>";
+      print "<td class='invalid_reason'>".h(t($child["invalid_reason"]))."</td>";
       print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
       print "<td class='child_term_language'>".h($child["language"])."</td>";
       print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";

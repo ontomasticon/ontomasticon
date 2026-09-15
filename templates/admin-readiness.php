@@ -15,8 +15,8 @@ if (!userAllow("edit-terms")) {
     print "<h3 id='".h($issue["id"])."'>".h($issue["problem"])." (".count($issue["items"]).")</h3>";
     print "<ul class='readiness'>";
     foreach ($issue["items"] as $item) {
-      //Labels are names from the site's data, so they are escaped but not translated
-      print "<li><a href='".h($item["link"])."'>".h($item["label"])."</a></li>";
+      //Labels are names from the site's data, so they are escaped but not translated. Links are paths within the site.
+      print "<li><a href='".h(sitePath($item["link"]))."'>".h($item["label"])."</a></li>";
     }
     print "</ul>";
   }

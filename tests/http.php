@@ -24,8 +24,8 @@ if ($db->connect_error || siteDatabaseName() !== getenv("TEST_DB_NAME")) {
 
 resetDatabase("inst/ontomasticon.sql");
 //Skip the daily update check, which would contact GitHub
-$db->query("UPDATE `config` SET `value` = UNIX_TIMESTAMP() WHERE `key` = 'update_check';");
-$db->query("INSERT INTO `terms` (`shortname`, `name`, `language`, `opaque`) VALUES ('acoustic_allometry', 'Acoustic allometry', 'en', 0), ('opaque_term', 'Opaque term', 'en', 1);");
+$db->query("UPDATE ".table("config")." SET `value` = UNIX_TIMESTAMP() WHERE `key` = 'update_check';");
+$db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`) VALUES ('acoustic_allometry', 'Acoustic allometry', 'en', 0), ('opaque_term', 'Opaque term', 'en', 1);");
 
 define("HTTP_PORT", getenv("TEST_HTTP_PORT") ? getenv("TEST_HTTP_PORT") : "8765");
 $serverLog = sys_get_temp_dir()."/ontomasticon-http-tests.log";
@@ -109,6 +109,21 @@ check("a script in the lang parameter is not echoed into the page", strpos($body
 list(, , $body) = httpRequest("GET", "/?lang=xx");
 check("an unknown language still shows the interface text", strpos($body, "Powered by") !== FALSE);
 
+section("HTTP: languages");
+unset($GLOBALS["http_cookie"]);
+$db->query("INSERT INTO ".table("config")." (`key`, `value`) VALUES ('languages', 'jibberish');");
+list(, $headers, $body) = httpRequest("GET", "/", null, array("Accept-Language: jibberish, en;q=0.5"));
+check("a browser that prefers another of the site's languages gets the page in it",
+  strpos($body, "Flown by dragon called") !== FALSE && strpos($body, '<html lang="jibberish">') !== FALSE);
+check("which varies by Accept-Language header", hasHeader($headers, '/^Vary: .*Accept-Language/i'));
+check("with a link to switch language", strpos($body, "<a href='/?lang=en' hreflang='en' lang='en'>en</a>") !== FALSE);
+list(, , $body) = httpRequest("GET", "/cv?lang=en", null, array("Accept-Language: jibberish"));
+check("choosing a language overrides the browser's", strpos($body, "Powered by") !== FALSE);
+list(, , $body) = httpRequest("GET", "/cv", null, array("Accept-Language: jibberish"));
+check("and is remembered", strpos($body, "Powered by") !== FALSE);
+$db->query("DELETE FROM ".table("config")." WHERE `key` = 'languages';");
+unset($GLOBALS["http_cookie"]);
+
 section("HTTP: API");
 list($status, $headers, $body) = httpRequest("GET", "/api/term/?shortname=acoustic_allometry");
 $term = json_decode($body, TRUE);
@@ -125,7 +140,7 @@ $term = json_decode($body, TRUE);
 checkSame("finds an opaque term from the id in its URL", "opaque_term", is_array($term) ? $term["shortname"] : null);
 list(, , $body) = httpRequest("GET", "/api/term/?term=".rawurlencode("https://glossary.example.org/1"));
 checkSame("doesn't find a term that isn't opaque by its id", "null", $body);
-$db->query("INSERT INTO `terms` (`shortname`, `name`, `description`, `language`, `opaque`) VALUES ('agreement_song', 'Agreement song', 'The female’s response', 'en', 0);");
+$db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `description`, `language`, `opaque`) VALUES ('agreement_song', 'Agreement song', 'The female’s response', 'en', 0);");
 list(, , $body) = httpRequest("GET", "/api/term/?shortname=agreement_song");
 $term = json_decode($body, TRUE);
 checkSame("returns curly quotes intact", "The female’s response", is_array($term) ? $term["description"] : null);
@@ -143,9 +158,9 @@ list($status, , $body) = httpRequest("GET", "/api/term/?shortname=missing&format
 check("a missing term is not found", $status == 404 && $body == "null");
 
 section("HTTP: vocabularies");
-$db->query("INSERT INTO `cv` (`shortname`, `name`, `description`, `reference`) VALUES ('calls', 'Calls', '<p>Types of call.</p>', '');");
-$db->query("INSERT INTO `terms` (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('calling_song', 'Calling song', 'en', 0, 'calls');");
-$db->query("INSERT INTO `terms` (`shortname`, `name`, `language`, `opaque`, `cv`, `broader`) SELECT 'rivalry_call', 'Rivalry call', 'en', 0, 'calls', `id` FROM `terms` WHERE `shortname` = 'calling_song';");
+$db->query("INSERT INTO ".table("cv")." (`shortname`, `name`, `description`, `reference`) VALUES ('calls', 'Calls', '<p>Types of call.</p>', '');");
+$db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('calling_song', 'Calling song', 'en', 0, 'calls');");
+$db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`, `broader`) SELECT 'rivalry_call', 'Rivalry call', 'en', 0, 'calls', `id` FROM ".table("terms")." WHERE `shortname` = 'calling_song';");
 list($status, $headers, $body) = httpRequest("GET", "/api/cv/?shortname=calls");
 $ld = json_decode($body, TRUE);
 $graph = (is_array($ld) && isset($ld["@graph"])) ? $ld["@graph"] : array(array("@id" => null, "@type" => null));
@@ -164,7 +179,7 @@ check("with the terms that aren't in a vocabulary", in_array("https://glossary.e
   && !in_array("https://glossary.example.org/cv/calls#calling_song", array_column($graph, "@id")));
 list($status, , $body) = httpRequest("GET", "/api/cv/?shortname=missing");
 check("a missing vocabulary is not found", $status == 404 && $body == "null");
-$db->query("INSERT INTO `terms` (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('opaque_call', 'Opaque call', 'en', 1, 'calls');");
+$db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('opaque_call', 'Opaque call', 'en', 1, 'calls');");
 $opaqueCall = getTerm("opaque_call");
 list(, , $body) = httpRequest("GET", "/cv/calls");
 check("the vocabulary page has an entry for each term, at the fragment of its URI",
@@ -210,9 +225,9 @@ list(, , $body) = httpRequest("GET", "/ping", null, $asJSONLD);
 checkSame("other addresses aren't affected", "pong", $body);
 
 section("HTTP: term types");
-$db->query("UPDATE `terms` SET `type` = 'property' WHERE `shortname` = 'agreement_song';");
+$db->query("UPDATE ".table("terms")." SET `type` = 'property' WHERE `shortname` = 'agreement_song';");
 list(, , $body) = httpRequest("GET", "/");
-check("a property's type is shown with it", strpos($body, '<p class="term_type">Property</p>') !== FALSE);
+check("a property's type is shown with it", strpos($body, '<p class="term-type">Property</p>') !== FALSE);
 list(, , $body) = httpRequest("GET", "/api/term/?shortname=agreement_song&format=jsonld");
 $concept = json_decode($body, TRUE);
 checkSame("and its JSON-LD gives both of its types", array("skos:Concept", "rdf:Property"), is_array($concept) ? $concept["@type"] : null);
@@ -275,6 +290,7 @@ check("changes the password", strpos($body, "Saved.") !== FALSE);
 list($status, , $body) = httpRequest("GET", "/admin/config");
 checkSame("admin pages open once the password is changed", 200, $status);
 check("admin forms post back to the requested address", strpos($body, '<form action="/admin/config"') !== FALSE);
+check("the admin menu links to the configuration page", strpos($body, "<a href='/admin/config'>Configure site</a>") !== FALSE);
 check("the configuration form has the publishing settings",
   strpos($body, 'name="publisher"') !== FALSE && strpos($body, 'name="license"') !== FALSE && strpos($body, 'name="prefix"') !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/config", array(
@@ -293,6 +309,11 @@ check("and lists terms without a definition, linking to where they can be edited
   strpos($body, "<h3 id='definition'>") !== FALSE && strpos($body, "<a href='/admin/term/edit/acoustic_allometry'>acoustic_allometry</a>") !== FALSE);
 check("but not the license, which is now set", strpos($body, "<h3 id='license'>") === FALSE);
 check("the administration menu links to it", strpos($body, "<a href='/admin/readiness'>") !== FALSE);
+list(, , $body) = httpRequest("GET", "/admin/term/add");
+check("the add term page has a well-formed heading", strpos($body, "<h3>Add term</h3>") !== FALSE);
+list(, , $body) = httpRequest("POST", "/admin/term/edit/acoustic_allometry", array("csrf_token" => $token, "delete" => ""));
+check("deleting a term first asks to confirm deleting that one term",
+  strpos($body, '<button type="submit" name="delete_term">Delete term</button>') !== FALSE && getTerm("acoustic_allometry") !== null);
 
 list(, , $body) = httpRequest("POST", "/user/login", array("csrf_token" => $token, "logout" => ""));
 check("logs out", strpos($body, "Logged out.") !== FALSE);
@@ -300,6 +321,29 @@ list(, , $body) = httpRequest("GET", "/admin/config");
 check("admin pages are refused after logging out", strpos($body, "You do not have permission") !== FALSE);
 list(, , $body) = httpRequest("GET", "/admin/readiness");
 check("and so is the readiness report", strpos($body, "You do not have permission") !== FALSE && strpos($body, "<h3 id=") === FALSE);
+
+section("HTTP: installed in a subdirectory");
+$db->query("UPDATE ".table("config")." SET `value` = 'glossary.example.org/sub/' WHERE `key` = 'base_url';");
+unset($GLOBALS["http_cookie"]);
+list($status, $headers, $body) = httpRequest("GET", "/sub/");
+checkSame("the home page loads at the subdirectory", 200, $status);
+check("the session cookie is limited to the subdirectory", hasHeader($headers, '#^Set-Cookie: PHPSESSID=.*path=/sub/;#i'));
+check("the stylesheet and links are in the subdirectory",
+  strpos($body, 'href="/sub/css/default.css"') !== FALSE && strpos($body, "href='/sub/user/login'") !== FALSE);
+list(, , $body) = httpRequest("GET", "/sub/cv/calls");
+check("vocabulary pages are found in the subdirectory", strpos($body, "Controlled Vocabulary: Calls") !== FALSE);
+list($status, , $body) = httpRequest("GET", "/sub/acoustic_allometry", null, $asJSONLD);
+$concept = json_decode($body, TRUE);
+check("a term's URI includes the subdirectory, and is found there",
+  $status == 200 && is_array($concept) && $concept["@id"] === "https://glossary.example.org/sub/acoustic_allometry");
+list(, , $body) = httpRequest("GET", "/sub/user/login");
+preg_match("/name='csrf_token' value='([0-9a-f]{64})'/", $body, $matches);
+check("the login form posts back to the subdirectory", strpos($body, '<form action="/sub/user/login"') !== FALSE);
+httpRequest("POST", "/sub/user/login", array("csrf_token" => isset($matches[1]) ? $matches[1] : "", "email" => "admin", "password" => "n3w-secret", "submit" => ""));
+list(, , $body) = httpRequest("GET", "/sub/admin/readiness");
+check("logging in works in the subdirectory, and the readiness report links there",
+  strpos($body, "<a href='/sub/admin/readiness'>") !== FALSE && strpos($body, "<a href='/sub/admin/term/edit/acoustic_allometry'>acoustic_allometry</a>") !== FALSE);
+$db->query("UPDATE ".table("config")." SET `value` = 'glossary.example.org/' WHERE `key` = 'base_url';");
 
 proc_terminate($server);
 proc_close($server);

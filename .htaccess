@@ -1,9 +1,14 @@
 # Apache configuration for Ontomasticon.
 # Needs mod_rewrite, and AllowOverride All (or FileInfo) for this directory.
 # The same rules can go in the virtual host configuration instead.
+# The rules also work in a subdirectory, such as example.org/glossary/. Set base_url
+# (on the site configuration page) to include the subdirectory.
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # If the site is reached through an Alias rather than a directory in the document root,
+  # uncomment this and give the address path the site is at
+  # RewriteBase /glossary/
 
   # Code, templates, language files and tests are only used through index.php
   RewriteRule ^(core|templates|lang|tests)/ - [F]

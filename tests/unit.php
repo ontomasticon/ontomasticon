@@ -13,6 +13,17 @@ checkSame("h() treats NULL as an empty string", "", h(null));
 $_SERVER["REQUEST_URI"] = "/admin/term/edit/x'><script>";
 checkSame("form actions are escaped", "/admin/term/edit/x&#039;&gt;&lt;script&gt;", formAction());
 
+section("Table names");
+checkSame("tables have no prefix by default", "`terms`", table("terms"));
+$table_prefix = "site_";
+checkSame("with a table prefix, table names start with it", "`site_terms`", table("terms"));
+checkSame("SQL files get the prefix on the tables they create and fill, and nowhere else",
+  "DROP TABLE IF EXISTS `site_config`;\nCREATE TABLE `site_cv` (\n  `cv` varchar(50)\n);\nINSERT INTO `site_users` (email) VALUES ('terms');",
+  prefixTables("DROP TABLE IF EXISTS `config`;\nCREATE TABLE `cv` (\n  `cv` varchar(50)\n);\nINSERT INTO users (email) VALUES ('terms');"));
+check("a prefix may use letters, digits and underscores, or be empty", validTablePrefix("Site_2") && validTablePrefix(""));
+check("but nothing that could change the SQL", !validTablePrefix("a-b") && !validTablePrefix("x`; DROP") && !validTablePrefix("site\n"));
+$table_prefix = null;
+
 section("IP address ranges");
 check("IPv4 address inside a /16", ipInRanges("192.168.1.5", array("192.168.0.0/16")));
 check("IPv4 address outside a /16", !ipInRanges("192.169.0.1", array("192.168.0.0/16")));
@@ -176,6 +187,72 @@ checkSame("links keep the language and escape their text and address",
 $_GET = array();
 unset($GLOBALS["ontomasticon"]["language_data"]);
 
+section("Installed in a subdirectory");
+checkSame("at the top of a domain the base path is empty", "", basePath());
+$GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/terms/";
+checkSame("the base path is the path in base_url", "/terms", basePath());
+checkSame("the home page, with a trailing slash", array("page_type" => "home"), routeFor("/terms/"));
+checkSame("the home page, without one", array("page_type" => "home"), routeFor("/terms"));
+checkSame("routes by the path within the site",
+  array("page_type" => "cv", "active_page" => "birds"), routeFor("/terms/cv/birds?lang=fr"));
+checkSame("a term's own address", array("page_type" => "term", "active_page" => "song"), routeFor("/terms/song"));
+checkSame("a path that only starts with the same letters isn't in the site",
+  array("page_type" => "term", "active_page" => "termsong"), routeFor("/termsong"));
+checkSame("links to the site's pages include the subdirectory", "<a href='/terms/cv/birds'>birds</a>", l("birds", "/cv/birds"));
+checkSame("links to other sites don't", "<a href='https://example.org/'>x</a>", l("x", "https://example.org/"));
+checkSame("linked data links include it", "/terms/api/cv/", linkedDataFor(array("page_type" => "home")));
+checkSame("term URIs include it", "https://glossary.example.org/terms/cv/birds#song",
+  term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
+unset($GLOBALS["ontomasticon"]["pageInfo"]);
+$GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/";
+section("Choosing a language");
+$GLOBALS["ontomasticon"]["config"]["languages"] = "jibberish pt-BR";
+checkSame("the site is offered in its default language and the other languages setting", array("en", "jibberish", "pt-BR"), siteLanguages());
+function languageFor($acceptLanguage, $get = array(), $remembered = null) {
+  if ($acceptLanguage === null) {
+    unset($_SERVER["HTTP_ACCEPT_LANGUAGE"]);
+  } else {
+    $_SERVER["HTTP_ACCEPT_LANGUAGE"] = $acceptLanguage;
+  }
+  $_GET = $get;
+  if ($remembered === null) {
+    unset($_SESSION["lang"]);
+  } else {
+    $_SESSION["lang"] = $remembered;
+  }
+  return(detectLanguage());
+}
+checkSame("the default language when the browser doesn't say", "en", languageFor(null));
+checkSame("the language the browser asks for", "jibberish", languageFor("jibberish"));
+checkSame("skipping languages the site isn't offered in", "pt-BR", languageFor("fr-CH, fr;q=0.9, pt-BR;q=0.8, en;q=0.5"));
+checkSame("most preferred first, whatever the order", "jibberish", languageFor("en;q=0.5, jibberish"));
+checkSame("a language with a region matches the language", "en", languageFor("en-GB"));
+checkSame("and a language matches the language with a region", "pt-BR", languageFor("pt"));
+checkSame("in any case", "pt-BR", languageFor("PT-br"));
+checkSame("not a language refused with q=0", "en", languageFor("jibberish;q=0"));
+checkSame("the default language when the browser accepts any", "en", languageFor("*"));
+checkSame("?lang= overrides the browser", "en", languageFor("jibberish", array("lang" => "en")));
+checkSame("as does a language chosen earlier in the visit", "pt-BR", languageFor("jibberish", array(), "pt-BR"));
+checkSame("unless the site is no longer offered in it", "en", languageFor(null, array(), "fr"));
+languageFor(null, array("lang" => "jibberish"));
+rememberLanguage();
+checkSame("a language chosen with ?lang= is remembered", "jibberish", isset($_SESSION["lang"]) ? $_SESSION["lang"] : null);
+languageFor(null, array("lang" => "xx"));
+rememberLanguage();
+check("unless the site isn't offered in it", !isset($_SESSION["lang"]));
+
+$_SERVER["REQUEST_URI"] = "/cv/birds?lang=en&x=1";
+languageFor(null, array("lang" => "en", "x" => "1"));
+$switcher = languageSwitcher();
+check("the language switcher links to the same page in each other language",
+  strpos($switcher, "<a href='/cv/birds?lang=jibberish&amp;x=1' hreflang='jibberish' lang='jibberish'>jibberish</a>") !== FALSE
+  && strpos($switcher, "<a href='/cv/birds?lang=pt-BR&amp;x=1'") !== FALSE);
+check("and marks the current language without linking it", strpos($switcher, "<strong lang='en'>en</strong>") !== FALSE && strpos($switcher, "lang=en") === FALSE);
+$GLOBALS["ontomasticon"]["config"]["languages"] = "";
+checkSame("there is no switcher when the site has one language", "", languageSwitcher());
+languageFor(null);
+unset($GLOBALS["ontomasticon"]["config"]["languages"]);
+
 section("CSRF tokens");
 $_SESSION = array();
 $token = csrfToken();
@@ -208,6 +285,15 @@ checkSame("removes tags and decodes entities", "Pulses & echemes", plainText("<b
 checkSame("separates paragraphs with a space", "First. Second.", plainText("<p>First.</p>\r\n\r\n<p>Second.</p>"));
 checkSame("keeps escaped angle brackets as text", "a <b> tag", plainText("a &lt;b&gt; tag"));
 checkSame("NULL gives an empty string", "", plainText(null));
+
+section("Term languages");
+checkSame("termLanguageError() accepts language tags with a script or region", array(null, null, null),
+  array(termLanguageError("en"), termLanguageError("zh-Hant"), termLanguageError("es-419")));
+checkSame("and no language", null, termLanguageError(""));
+check("but not en_GB, or a tag with a trailing newline", termLanguageError("en_GB") !== null && termLanguageError("en\n") !== null);
+checkSame("accepts a tag of 35 characters", null, termLanguageError("en-abcdefgh-abcdefgh-abcdefgh-abcde"));
+check("but not a longer one, which the database can't hold", termLanguageError("en-abcdefgh-abcdefgh-abcdefgh-abcdef") !== null);
+checkSame("JSON-LD doesn't tag text with a language that has a trailing newline", "Canto", jsonLDText("Canto", "en\n"));
 
 section("JSON output");
 if (!function_exists("json_encode")) {

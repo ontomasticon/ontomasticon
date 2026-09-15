@@ -14,6 +14,11 @@ jobs:
       matrix:
         # Oldest supported version, and a recent 8.x release
         php: ['7.3', '8.4']
+        table_prefix: ['']
+        # And with prefixed table names, as when sites share a database
+        include:
+          - php: '8.4'
+            table_prefix: 'site_'
     services:
       mariadb:
         image: mariadb:11
@@ -41,6 +46,7 @@ jobs:
           cat > settings/db.php <<'EOF'
           <?php
           $db = new mysqli(getenv("TEST_DB_HOST"), getenv("TEST_DB_USER"), getenv("TEST_DB_PASSWORD"), getenv("TEST_DB_NAME"));
+          $table_prefix = (string)getenv("TEST_TABLE_PREFIX");
           EOF
 
       - name: Run tests
@@ -50,4 +56,5 @@ jobs:
           TEST_DB_PASSWORD: root
           TEST_DB_NAME: ontomasticon_test
           TEST_HTTP: "1"
+          TEST_TABLE_PREFIX: ${{ matrix.table_prefix }}
         run: php tests/run.php
