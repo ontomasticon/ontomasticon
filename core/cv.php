@@ -98,9 +98,27 @@ function addCV() {
   return($ok);
 }
 
+//Why a vocabulary can't be deleted, or NULL if it can. Synonyms are only shown with the term they are a synonym of,
+//so synonyms outside the vocabulary of its terms would be left out of sight, and have to be dealt with first.
+function cvDeleteError($CV) {
+  $sql  = "SELECT `t`.`shortname` FROM ".table("terms")." AS `t` JOIN ".table("terms")." AS `d` ON `t`.`parent` = `d`.`id` ";
+  $sql .= "WHERE `d`.`cv` = ? AND `t`.`invalid_reason` = 'Synonym' AND (`t`.`cv` IS NULL OR `t`.`cv` <> ?) ORDER BY `t`.`shortname`;";
+  $result = dbQuery($sql, array($CV, $CV));
+  $synonyms = ($result) ? array_column($result->fetch_all(MYSQLI_ASSOC), "shortname") : array();
+  if (count($synonyms) == 0) {
+    return(null);
+  }
+  return(t("Not deleted. Terms outside this controlled vocabulary are synonyms of its terms. Change their parent, or delete them, first:")." ".implode(", ", $synonyms));
+}
+
 function deleteCV() {
   global $db;
   $CV = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
+  $error = cvDeleteError($CV);
+  if ($error !== null) {
+    printError($error);
+    return(FALSE);
+  }
 
   $db->begin_transaction();
   //Unlink terms elsewhere that refer to this vocabulary's terms, so they don't point at missing terms

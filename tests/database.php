@@ -81,6 +81,7 @@ check("the login_attempts table exists", $db->query("SELECT 1 FROM ".table("logi
 check("terms have created and modified columns", $db->query("SELECT `created`, `modified` FROM ".table("terms")." LIMIT 1;") !== FALSE);
 check("vocabularies have a prefix column", $db->query("SELECT `prefix` FROM ".table("cv")." LIMIT 1;") !== FALSE);
 check("the linked data settings exist", count(array_intersect(array("publisher", "license", "prefix"), array_keys(getConfig()))) == 3);
+check("term languages can be 35 characters long", !termLanguageColumnTooNarrow());
 
 section("Adding terms");
 termForm(array("shortname" => "sound", "name" => "Sound"));
@@ -124,6 +125,22 @@ termForm(array("shortname" => "animal_sound", "name" => "Animal sound", "broader
 capture(function() { return(addTerm()); });
 checkSame("saves the parent as the parent's id", termRow("sound")["id"], termRow("bird_song")["parent"]);
 checkSame("saves the reference", "Smith 2020", termRow("bird_song")["reference"]);
+termForm(array("shortname" => "echo", "name" => "Echo", "broader" => "echo"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("refuses a term as its own broader term", !$ok && strpos($out, "its own parent or broader term") !== FALSE && termRow("echo") == null);
+termForm(array("shortname" => "echo", "name" => "Echo", "language" => "en_GB"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("refuses a language that isn't a language tag", !$ok && strpos($out, "must be a language tag") !== FALSE && termRow("echo") == null);
+termForm(array("shortname" => "echo", "name" => "Echo", "language" => "zh-Hant"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+checkSame("saves a language tag longer than five characters", "zh-Hant", $ok ? termRow("echo")["language"] : null);
+termForm(array("shortname" => "reverb", "name" => "Reverb", "language" => "en-abcdefgh-abcdefgh-abcdefgh-abcde"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+checkSame("and one of 35 characters", "en-abcdefgh-abcdefgh-abcdefgh-abcde", $ok ? termRow("reverb")["language"] : null);
+termForm(array("shortname" => "silence", "name" => "Silence", "language" => ""));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("a term can have no language", $ok && termRow("silence") != null);
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` IN ('echo', 'reverb', 'silence');");
 checkSame("quotes in values can't change a query", null, getTerm("x' OR '1'='1"));
 
 section("Listing terms");
@@ -190,12 +207,50 @@ checkSame("gives when the term was added as a date in JSON-LD", array("@value" =
 termForm(array("name" => "Changed", "parent" => "missing"));
 list($out, $ok) = capture(function() { return(editTerm()); });
 check("refuses a parent term that doesn't exist", !$ok && termRow("bird_song")["name"] == "Birdsong");
+termForm(array("name" => "Changed", "parent" => "bird_song"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("refuses the term as its own parent", !$ok && strpos($out, "its own parent or broader term") !== FALSE && termRow("bird_song")["parent"] == termRow("sound")["id"]);
+termForm(array("name" => "Changed", "parent" => "sound", "language" => "en_GB"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("refuses a language that isn't a language tag", !$ok && strpos($out, "must be a language tag") !== FALSE && termRow("bird_song")["language"] == "en");
+$GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "sound";
+termForm(array("name" => "Sound", "broader" => "animal_sound"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("refuses a broader term whose broader term is this term, which would make a loop",
+  !$ok && strpos($out, "make a loop") !== FALSE && termRow("sound")["broader"] === null);
+dbQuery("UPDATE ".table("terms")." SET `broader` = ? WHERE `shortname` = 'bird_song';", array(termRow("animal_sound")["id"]));
+termForm(array("name" => "Sound", "broader" => "bird_song"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("or a loop further up", !$ok && strpos($out, "make a loop") !== FALSE && termRow("sound")["broader"] === null);
+dbQuery("UPDATE ".table("terms")." SET `broader` = NULL WHERE `shortname` = 'bird_song';");
+termForm(array("name" => "Sound", "parent" => "bird_song"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("refuses a parent term whose parent is this term", !$ok && strpos($out, "make a loop") !== FALSE && termRow("sound")["parent"] === null);
+termForm(array("name" => "Sound", "parent" => "animal_sound"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("but allows a parent term whose broader term is this term, as they are different kinds of link",
+  $ok && termRow("sound")["parent"] == termRow("animal_sound")["id"]);
+dbQuery("UPDATE ".table("terms")." SET `broader` = ? WHERE `shortname` = 'animal_sound';", array(termRow("bird_song")["id"]));
+dbQuery("UPDATE ".table("terms")." SET `broader` = ? WHERE `shortname` = 'bird_song';", array(termRow("animal_sound")["id"]));
+termForm(array("name" => "Sound", "broader" => "animal_sound"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("stops following links at a loop saved before loops were refused", $ok && termRow("sound")["broader"] == termRow("animal_sound")["id"]);
+dbQuery("UPDATE ".table("terms")." SET `broader` = NULL WHERE `shortname` IN ('sound', 'bird_song');");
+dbQuery("UPDATE ".table("terms")." SET `broader` = ? WHERE `shortname` = 'animal_sound';", array(termRow("sound")["id"]));
 
 section("Deleting terms");
 $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "sound";
+termForm(array("shortname" => "noise", "name" => "Noise", "invalid" => "Synonym", "parent" => "sound"));
+capture(function() { return(addTerm()); });
+list($out, $ok) = capture(function() { return(deleteTerm()); });
+check("refuses to delete a term that has synonyms, naming them",
+  !$ok && strpos($out, "synonyms of this term") !== FALSE && strpos($out, "noise") !== FALSE && termRow("sound") != null);
+list($page) = capture(function() { template("admin-term-delete.php"); });
+check("and the delete page says why instead of offering to delete", strpos($page, "noise") !== FALSE && strpos($page, "delete_term") === FALSE);
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'noise';");
 list($out, $ok) = capture(function() { return(deleteTerm()); });
 check("deletes the term", $ok && termRow("sound") == null);
-checkSame("clears parent links to it", null, termRow("bird_song")["parent"]);
+checkSame("clears parent links to it from terms that aren't synonyms", null, termRow("bird_song")["parent"]);
 checkSame("clears broader links to it", null, termRow("animal_sound")["broader"]);
 
 section("Controlled vocabularies");
@@ -263,8 +318,16 @@ check("editing a vocabulary changes its namespace prefix", $ok && getCVs()["bird
 $_POST["prefix"] = "has space";
 list($out, $ok) = capture(function() { return(editCV()); });
 check("but refuses one that can't be used", !$ok && getCVs()["birds"]["prefix"] == "aves");
+termForm(array("shortname" => "redbreast", "name" => "Redbreast", "invalid" => "Synonym", "parent" => "robin"));
+capture(function() { return(addTerm()); });
+termForm(array("shortname" => "erithacus", "name" => "Erithacus", "cv" => "birds", "invalid" => "Synonym", "parent" => "robin"));
+capture(function() { return(addTerm()); });
 list($out, $ok) = capture(function() { return(deleteCV()); });
-check("deletes the vocabulary and its terms", $ok && !array_key_exists("birds", getCVs()) && termRow("robin") == null);
+check("refuses to delete a vocabulary whose terms have synonyms outside it, naming only those",
+  !$ok && strpos($out, "redbreast") !== FALSE && strpos($out, "erithacus") === FALSE && array_key_exists("birds", getCVs()));
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'redbreast';");
+list($out, $ok) = capture(function() { return(deleteCV()); });
+check("deletes the vocabulary and its terms, including its synonyms", $ok && !array_key_exists("birds", getCVs()) && termRow("robin") == null && termRow("erithacus") == null);
 checkSame("clears links from other terms to the deleted terms", null, termRow("wren_song")["parent"]);
 
 section("Site configuration");
@@ -411,7 +474,12 @@ check("adds the created and modified columns, leaving existing terms without dat
 check("adds the vocabulary prefix column", $db->query("SELECT `prefix` FROM ".table("cv")." LIMIT 1;") !== FALSE);
 checkSame("and the linked data settings, empty", array("", "", ""),
   array(getConfig()["publisher"], getConfig()["license"], getConfig()["prefix"]));
+check("widens the language column for longer language tags", !termLanguageColumnTooNarrow());
 check("running it again changes nothing", strpos(runUpdate(), "No updates required") !== FALSE);
+$db->query("ALTER TABLE ".table("terms")." MODIFY COLUMN `language` VARCHAR(5) DEFAULT NULL;");
+$out = runUpdate();
+check("widens the language column of a database that was already at 0.4, keeping its version",
+  strpos($out, "35 characters") !== FALSE && !termLanguageColumnTooNarrow() && (string)getConfig()["version_db"] == "0.4");
 
 section("Two sites in one database");
 $firstPrefix = $table_prefix;

@@ -301,7 +301,8 @@ function adminSanity() {
   $pageInfo = $GLOBALS["ontomasticon"]["pageInfo"];
   if (!($pageInfo["page_type"] == "admin" && $pageInfo["active_page"] == "update")) {
     $versionOrder = version_compare((string)$config["version_db"], (string)$config["version"]);
-    if ($versionOrder < 0) {
+    //The language column was widened without a new version, so a database already at 0.4 can still need updating
+    if ($versionOrder < 0 || ($versionOrder == 0 && termLanguageColumnTooNarrow())) {
       $ret["Database update"] = "You need to run the ".l("database update script", "/admin/update").".";
     }
     if ($versionOrder > 0) {
