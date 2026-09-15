@@ -21,7 +21,13 @@
     <h4>&amp;format=jsonld or &amp;format=ttl</h4>
     <p>
         Add to either endpoint to return the term as a SKOS concept in JSON-LD or Turtle, including
-        the properties TDWG requires of controlled vocabulary terms.
+        the properties TDWG requires of controlled vocabulary terms. A term's acronym is an alternative label.
+    </p>
+    <p>
+        On a site that is a glossary, the term is followed by its words as OntoLex lexical entries: its name
+        at the term's URI with <code>#entry</code> added (or <code>:entry</code> when the URI already has a
+        fragment), and its acronym at <code>#acronym</code> (or <code>:acronym</code>). They give their LexInfo
+        term type, and whether the word is the preferred term or, for a synonym, an admitted one.
     </p>
   </div>
 
@@ -30,9 +36,9 @@
 
     <h4>/api/search/?q=</h4>
     <p>
-        Returns a JSON array of up to ten terms whose name or short name contains the text, those that start
+        Returns a JSON array of up to ten terms whose name, short name or acronym contains the text, those that start
         with it first, as the site's search box suggests them. Each has its <code>name</code>,
-        <code>shortname</code> and <code>uri</code>, and the name of its <code>vocabulary</code> (or null).
+        <code>shortname</code>, <code>acronym</code> (or null) and <code>uri</code>, and the name of its <code>vocabulary</code> (or null).
         A synonym also has <code>synonym_of</code>, the name of the term it is a synonym of, and the
         <code>uri</code> and <code>vocabulary</code> of that term.
     </p>

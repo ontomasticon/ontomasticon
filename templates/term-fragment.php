@@ -6,6 +6,10 @@
   ?></h3>
   <p class="term-uri"><?php print term2URI($GLOBALS["ontomasticon"]["term"], TRUE); ?></p>
   <?php
+  //A glossary gives a term's acronym
+  if (isGlossary() && isset($GLOBALS["ontomasticon"]["term"]["acronym"]) && $GLOBALS["ontomasticon"]["term"]["acronym"] != "") {
+    print '<p class="term-acronym">'.h(t("Acronym")).": ".h($GLOBALS["ontomasticon"]["term"]["acronym"]).'</p>';
+  }
   //Most terms are concepts, so only other types are shown
   $termType = termType(isset($GLOBALS["ontomasticon"]["term"]["type"]) ? $GLOBALS["ontomasticon"]["term"]["type"] : null);
   if ($termType != "concept") {

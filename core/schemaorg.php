@@ -52,8 +52,11 @@ function schemaOrgTerm($term) {
   if ($term->name != "") {
     $node["name"] = jsonLDText($term->name, $term->language);
   }
-  //Synonyms' names are other names for the term, as they are alternative labels in SKOS
+  //Its acronym and its synonyms' names are other names for the term, as they are alternative labels in SKOS
   $alternateNames = array();
+  if ($term->acronym != "") {
+    $alternateNames[] = jsonLDText($term->acronym, $term->language);
+  }
   foreach ($term->children() as $child) {
     if ($child->isSynonym() && $child->name != "" && $child->name != $term->name) {
       $alternateNames[] = jsonLDText($child->name, $child->language);

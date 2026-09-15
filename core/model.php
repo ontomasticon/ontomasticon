@@ -24,6 +24,8 @@ class Term {
   //Where a property's values come from: a vocabulary's shortname, or one of termDatatypes(), or NULL
   public $rangeCV;
   public $datatype;
+  //An acronym the term is also known by, or NULL
+  public $acronym;
 
   //Related terms that have been loaded, by relation name
   private $related = array();
@@ -32,7 +34,7 @@ class Term {
   //except the type, which is a concept unless the row gives another type.
   public static function fromRow($row) {
     $columns = array(
-      "id" => "id", "shortname" => "shortname", "name" => "name", "description" => "description",
+      "id" => "id", "shortname" => "shortname", "name" => "name", "acronym" => "acronym", "description" => "description",
       "language" => "language", "opaque" => "opaque", "cv" => "cv", "parent" => "parentID",
       "broader" => "broaderID", "invalid_reason" => "invalidReason", "reference" => "reference",
       "created" => "created", "modified" => "modified", "range_cv" => "rangeCV", "datatype" => "datatype"
@@ -161,6 +163,14 @@ class Term {
   //its shortname, or its id if the term is opaque
   public function anchor() {
     return(($this->opaque == 0) ? $this->shortname : $this->id);
+  }
+
+  //The URI of one of the term's words on a glossary (see termLexicalEntries()), such as "entry" for its name: the term's
+  //URI with the word as its fragment, or, when the URI already has a fragment, added to it after a colon, which short
+  //names can't contain
+  public function entryURI($word) {
+    $uri = $this->uri();
+    return($uri.((strpos($uri, "#") === FALSE) ? "#" : ":").$word);
   }
 
   public function vocabulary() {

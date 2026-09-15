@@ -21,6 +21,7 @@ CREATE TABLE `terms` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `shortname` varchar(45) DEFAULT NULL,
   `name` varchar(200) DEFAULT NULL,
+  `acronym` varchar(50) DEFAULT NULL,
   `description` longtext DEFAULT NULL,
   `language` varchar(35) DEFAULT NULL,
   `opaque` tinyint(4) DEFAULT NULL,
@@ -62,8 +63,8 @@ CREATE TABLE `login_attempts` (
   KEY `ip_attempted` (`ip`, `attempted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO config VALUES('version_db', '0.4.3');
-INSERT INTO config VALUES('version', '0.4.3');
+INSERT INTO config VALUES('version_db', '0.4.4');
+INSERT INTO config VALUES('version', '0.4.4');
 INSERT INTO config VALUES('mode', 'production');
 INSERT INTO config VALUES('default_lang', 'en');
 INSERT INTO config VALUES('description', 'Description goes here.');

@@ -84,6 +84,7 @@ check("the linked data settings exist", count(array_intersect(array("publisher",
 check("term languages can be 35 characters long", !termLanguageColumnTooNarrow());
 check("terms have a type column", $db->query("SELECT `type` FROM ".table("terms")." LIMIT 1;") !== FALSE);
 check("and columns for where a property's values come from", $db->query("SELECT `range_cv`, `datatype` FROM ".table("terms")." LIMIT 1;") !== FALSE);
+check("terms have an acronym column", $db->query("SELECT `acronym` FROM ".table("terms")." LIMIT 1;") !== FALSE);
 
 section("Adding terms");
 termForm(array("shortname" => "sound", "name" => "Sound"));
@@ -148,6 +149,18 @@ list($out, $ok) = capture(function() { return(addTerm()); });
 checkSame("saves several references one per line, however they were separated, leaving out blank lines and with no length limit",
   "Krause 2015\nPijanowski 2011\n".trim(str_repeat("A long reference. ", 40)), $ok ? termRow("anthropophony")["reference"] : null);
 dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'anthropophony';");
+termForm(array("shortname" => "sonar", "name" => "Sound navigation and ranging", "acronym" => " SONAR "));
+list($out, $ok) = capture(function() { return(addTerm()); });
+checkSame("saves a term's acronym, without spaces around it", "SONAR", $ok ? termRow("sonar")["acronym"] : null);
+termForm(array("name" => "Sound navigation and ranging", "acronym" => ""));
+$GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "sonar";
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("and saves no acronym as none", $ok && termRow("sonar")["acronym"] === null);
+unset($GLOBALS["ontomasticon"]["pageInfo"]);
+termForm(array("shortname" => "long_acronym", "name" => "Long acronym", "acronym" => str_repeat("A", 51)));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("refuses an acronym longer than 50 characters", !$ok && strpos($out, "acronym can be at most 50 characters") !== FALSE && termRow("long_acronym") == null);
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'sonar';");
 termForm(array("shortname" => "echo", "name" => "Echo", "broader" => "echo"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("refuses a term as its own broader term", !$ok && strpos($out, "its own parent or broader term") !== FALSE && termRow("echo") == null);
@@ -191,11 +204,16 @@ termForm(array("shortname" => "stridulatory_sound", "name" => "Stridulatory soun
 capture(function() { return(addTerm()); });
 termForm(array("shortname" => "full_duty_cycle", "name" => "100% duty cycle"));
 capture(function() { return(addTerm()); });
+termForm(array("shortname" => "passive_acoustic_monitoring", "name" => "Passive acoustic monitoring", "acronym" => "PAM"));
+capture(function() { return(addTerm()); });
 checkSame("suggests terms whose name contains the search, those starting with it first, with one suggestion for each term",
   array("stridulation", "wing_stridulation"), array_column(termSuggestions("stridul"), "shortname"));
 checkSame("ignoring case", array("wing_stridulation"), array_column(termSuggestions("WING"), "shortname"));
-checkSame("a synonym leads to the term it is a synonym of", array(array("name" => "Stridulatory sound", "shortname" => "stridulatory_sound",
+checkSame("a synonym leads to the term it is a synonym of", array(array("name" => "Stridulatory sound", "shortname" => "stridulatory_sound", "acronym" => null,
   "uri" => "https://glossary.example.org/stridulation", "vocabulary" => null, "synonym_of" => "Stridulation")), termSuggestions("stridulatory"));
+checkSame("suggests a term by its acronym, giving the acronym", array(array("passive_acoustic_monitoring", "PAM")),
+  array_map(function($s) { return(array($s["shortname"], $s["acronym"])); }, termSuggestions("pam")));
+checkSame("and the results page finds it by its acronym too", array("passive_acoustic_monitoring"), array_column(searchTerms("PAM"), "shortname"));
 checkSame("suggests at most as many as asked for", 1, count(termSuggestions("stridul", 1)));
 checkSame("a % in the search only matches itself", array("full_duty_cycle"), array_column(termSuggestions("%"), "shortname"));
 checkSame("nothing is suggested for an empty search", array(), termSuggestions(""));
@@ -203,7 +221,7 @@ checkSame("the results page lists valid terms whose definition contains the sear
   array_column(searchTerms("rubbing"), "shortname"));
 checkSame("and terms with a synonym that matches", array("stridulation"), array_column(searchTerms("stridulatory"), "shortname"));
 check("with their related terms", isset(searchTerms("wing")[0]["narrower"]));
-dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` IN ('stridulatory_sound', 'stridulation', 'wing_stridulation', 'full_duty_cycle');");
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` IN ('stridulatory_sound', 'stridulation', 'wing_stridulation', 'full_duty_cycle', 'passive_acoustic_monitoring');");
 
 section("Term objects");
 $shortnames = function($terms) {
@@ -538,7 +556,9 @@ check("and then the 0.4 step", strpos($out, "updated to version 0.4</p>") !== FA
 check("and the 0.4.1 step", strpos($out, "updated to version 0.4.1</p>") !== FALSE);
 check("and the 0.4.2 step", strpos($out, "updated to version 0.4.2</p>") !== FALSE);
 check("and the 0.4.3 step", strpos($out, "updated to version 0.4.3</p>") !== FALSE);
-checkSame("leaving the database at 0.4.3", "0.4.3", (string)getConfig()["version_db"]);
+check("and the 0.4.4 step", strpos($out, "updated to version 0.4.4</p>") !== FALSE);
+checkSame("leaving the database at 0.4.4", "0.4.4", (string)getConfig()["version_db"]);
+check("adds the acronym column, empty", array_key_exists("acronym", termRow("orphan")) && termRow("orphan")["acronym"] === null);
 $referenceColumn = $db->query("SHOW COLUMNS FROM ".table("terms")." LIKE 'reference';")->fetch_assoc();
 checkSame("with room for several references", "text", strtolower($referenceColumn["Type"]));
 check("email addresses must now be unique", !$db->query("INSERT INTO ".table("users")." (`email`) VALUES ('twice@example.org');"));

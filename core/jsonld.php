@@ -4,10 +4,15 @@
 //
 // JSON-LD output. Terms are SKOS concepts, with the properties TDWG requires of
 // controlled vocabulary terms (rdfs:label, rdfs:comment and rdf:value) as well.
-// Vocabularies are SKOS concept schemes.
+// Vocabularies are SKOS concept schemes. On a glossary, the words for each term are
+// also given as OntoLex lexical entries, described with LexInfo (see termLexicalEntries()).
+
+//The namespaces of OntoLex, which models words and what they mean, and of LexInfo, which describes words
+define("ONTOLEX_NAMESPACE", "http://www.w3.org/ns/lemon/ontolex#");
+define("LEXINFO_NAMESPACE", "http://www.lexinfo.net/ontology/3.0/lexinfo#");
 
 function jsonLDContext() {
-  return(array(
+  $context = array(
     "dcterms" => "http://purl.org/dc/terms/",
     "owl" => "http://www.w3.org/2002/07/owl#",
     "rdf" => "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
@@ -15,7 +20,14 @@ function jsonLDContext() {
     "skos" => "http://www.w3.org/2004/02/skos/core#",
     "vann" => "http://purl.org/vocab/vann/",
     "xsd" => "http://www.w3.org/2001/XMLSchema#"
-  ));
+  );
+  //Only a glossary's lexical entries use OntoLex and LexInfo
+  if (isGlossary()) {
+    $context["lexinfo"] = LEXINFO_NAMESPACE;
+    $context["ontolex"] = ONTOLEX_NAMESPACE;
+    ksort($context);
+  }
+  return($context);
 }
 
 //JSON-LD as text: indented, with URIs and non-ASCII characters left unescaped
@@ -23,13 +35,21 @@ function jsonLDOutput($data) {
   return(toJSON($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 }
 
-//A term as a SKOS concept, as an array ready for jsonLDOutput()
+//A term as a SKOS concept, as an array ready for jsonLDOutput(). On a glossary, a term with words to give as lexical
+//entries is a graph of the concept followed by its entries.
 function termJSONLD($term) {
-  return(array("@context" => jsonLDContext()) + termNode($term));
+  $entries = termLexicalEntries($term);
+  if (count($entries) == 0) {
+    return(array("@context" => jsonLDContext()) + termNode($term));
+  }
+  return(array(
+    "@context" => jsonLDContext(),
+    "@graph" => array_merge(array(termNode($term)), $entries)
+  ));
 }
 
-//A vocabulary, or the site's terms that aren't in one, as a SKOS concept scheme followed by
-//its terms as concepts, as an array ready for jsonLDOutput()
+//A vocabulary, or the site's terms that aren't in one, as a SKOS concept scheme followed by its terms as concepts,
+//and on a glossary by the lexical entries for their words, as an array ready for jsonLDOutput()
 function vocabularyJSONLD($vocabulary, $terms) {
   $config = $GLOBALS["ontomasticon"]["config"];
   $language = isset($config["default_lang"]) ? $config["default_lang"] : "";
@@ -71,9 +91,13 @@ function vocabularyJSONLD($vocabulary, $terms) {
   if (count($topConcepts) > 0) {
     $scheme["skos:hasTopConcept"] = $topConcepts;
   }
+  $entries = array();
+  foreach ($terms as $term) {
+    $entries = array_merge($entries, termLexicalEntries($term));
+  }
   return(array(
     "@context" => jsonLDContext(),
-    "@graph" => array_merge(array($scheme), $concepts)
+    "@graph" => array_merge(array($scheme), $concepts, $entries)
   ));
 }
 
@@ -127,9 +151,12 @@ function termNode($term) {
     $node["skos:narrower"] = $narrower;
   }
 
-  //A synonym's name is an alternative label for its parent, and a synonym is replaced by its parent.
+  //The term's acronym and its synonyms' names are alternative labels for it, and a synonym is replaced by its parent.
   //Other parent and child links are shown as "Related terms" on the site.
   $altLabels = array();
+  if ($term->acronym != "") {
+    $altLabels[] = jsonLDText($term->acronym, $term->language);
+  }
   $related = array();
   foreach ($term->children() as $child) {
     if (!$child->isSynonym()) {
@@ -161,6 +188,52 @@ function termNode($term) {
     }
   }
   return(jsonLDReference($node, $term->reference));
+}
+
+//On a glossary, the words for a term as OntoLex lexical entries, each denoting the concept the word means, without the
+//context; elsewhere none. The term's name is an entry at Term::entryURI("entry"): the preferred term for its concept, or
+//for a synonym an admitted term for the concept it is a synonym of. The term's acronym is an entry at
+//Term::entryURI("acronym"), the acronym for the name's entry, which is then the full form.
+function termLexicalEntries($term) {
+  if (!isGlossary()) {
+    return(array());
+  }
+  $parent = $term->parent();
+  $concept = jsonLDLink(($term->isSynonym() && $parent != null) ? $parent : $term);
+  $entries = array();
+  if ($term->name != "") {
+    $entry = lexicalEntryNode($term->entryURI("entry"), $term->name, $term->language, $concept);
+    if ($term->acronym != "") {
+      $entry["lexinfo:termType"] = array("@id" => LEXINFO_NAMESPACE."fullForm");
+    }
+    if ($term->isSynonym()) {
+      $entry["lexinfo:normativeAuthorization"] = array("@id" => LEXINFO_NAMESPACE."admittedTerm");
+    } elseif (!$term->isDeprecated()) {
+      $entry["lexinfo:normativeAuthorization"] = array("@id" => LEXINFO_NAMESPACE."preferredTerm");
+    }
+    $entries[] = $entry;
+  }
+  if ($term->acronym != "") {
+    $entry = lexicalEntryNode($term->entryURI("acronym"), $term->acronym, $term->language, $concept);
+    $entry["lexinfo:termType"] = array("@id" => LEXINFO_NAMESPACE."acronym");
+    if ($term->name != "") {
+      $entry["lexinfo:acronymFor"] = array("@id" => $term->entryURI("entry"));
+    }
+    $entries[] = $entry;
+  }
+  return($entries);
+}
+
+//A lexical entry at $uri for a word written as $text in $language, which means the concept $concept links to
+function lexicalEntryNode($uri, $text, $language, $concept) {
+  return(array(
+    "@id" => $uri,
+    "@type" => "ontolex:LexicalEntry",
+    "rdfs:label" => jsonLDText($text, $language),
+    //The written form has no address of its own, so it is a blank node
+    "ontolex:canonicalForm" => array("@type" => "ontolex:Form", "ontolex:writtenRep" => jsonLDText($text, $language)),
+    "ontolex:denotes" => $concept
+  ));
 }
 
 //A node with its references added (see referenceList()): web addresses as sources and anything else as citations,

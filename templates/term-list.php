@@ -1,9 +1,10 @@
 <?php
-//A list of terms, given as rows of the terms table in $GLOBALS["ontomasticon"]["terms"]. With the glossary display
-//setting, they are shown in alphabetical order under a heading for each letter, with links to the letters above and below.
+//A list of terms, given as rows of the terms table in $GLOBALS["ontomasticon"]["terms"]. On a glossary (see isGlossary()),
+//they are shown in alphabetical order under a heading for each letter, with links to the letters above and below, and
+//each term's acronym is listed as well, pointing to the term.
 $terms = $GLOBALS["ontomasticon"]["terms"];
-$glossary = glossaryDisplay() && count($terms) > 0;
-$groups = ($glossary) ? glossaryGroups($terms) : array("" => $terms);
+$glossary = isGlossary() && count($terms) > 0;
+$groups = ($glossary) ? glossaryGroups(glossaryEntries($terms)) : array("" => $terms);
 if ($glossary) {
   print glossaryIndex($groups);
 }
@@ -13,6 +14,11 @@ foreach ($groups as $letter => $group) {
     print '<h2 class="glossary-letter" id="'.h(glossaryAnchor($letter)).'">'.h($letter).'</h2>';
   }
   foreach ($group as $term) {
+    //An acronym points to the term's entry, which is in the same list
+    if (isset($term["see"])) {
+      print '<p class="glossary-see">'.h($term["name"]).', '.h(t("see")).' <a href="#'.h(termAnchor($term["see"])).'">'.h(glossaryLabel($term["see"])).'</a></p>';
+      continue;
+    }
     $GLOBALS["ontomasticon"]["term"] = $term;
     $GLOBALS["ontomasticon"]["oddeven"] = oe($oe);
     template("term-fragment.php");
