@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="<?php print h(t($GLOBALS["ontomasticon"]["config"]["default_lang"])); ?>">
+<html lang="<?php print h(currentLanguage()); ?>">
 <head>
 <meta charset = "UTF-8">
 <title><?php print h(tu("site_name")); ?></title>
@@ -82,6 +82,7 @@ switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
 <?php print adminLink(); ?><br/>
 <?php print userLink(); ?><br/>
 <?php print logInOut(); ?>
+<?php print languageSwitcher(); ?>
 </div>
 </body>
 

@@ -109,6 +109,21 @@ check("a script in the lang parameter is not echoed into the page", strpos($body
 list(, , $body) = httpRequest("GET", "/?lang=xx");
 check("an unknown language still shows the interface text", strpos($body, "Powered by") !== FALSE);
 
+section("HTTP: languages");
+unset($GLOBALS["http_cookie"]);
+$db->query("INSERT INTO ".table("config")." (`key`, `value`) VALUES ('languages', 'jibberish');");
+list(, $headers, $body) = httpRequest("GET", "/", null, array("Accept-Language: jibberish, en;q=0.5"));
+check("a browser that prefers another of the site's languages gets the page in it",
+  strpos($body, "Flown by dragon called") !== FALSE && strpos($body, '<html lang="jibberish">') !== FALSE);
+check("which varies by Accept-Language header", hasHeader($headers, '/^Vary: .*Accept-Language/i'));
+check("with a link to switch language", strpos($body, "<a href='/?lang=en' hreflang='en' lang='en'>en</a>") !== FALSE);
+list(, , $body) = httpRequest("GET", "/cv?lang=en", null, array("Accept-Language: jibberish"));
+check("choosing a language overrides the browser's", strpos($body, "Powered by") !== FALSE);
+list(, , $body) = httpRequest("GET", "/cv", null, array("Accept-Language: jibberish"));
+check("and is remembered", strpos($body, "Powered by") !== FALSE);
+$db->query("DELETE FROM ".table("config")." WHERE `key` = 'languages';");
+unset($GLOBALS["http_cookie"]);
+
 section("HTTP: API");
 list($status, $headers, $body) = httpRequest("GET", "/api/term/?shortname=acoustic_allometry");
 $term = json_decode($body, TRUE);

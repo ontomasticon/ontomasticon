@@ -293,6 +293,14 @@ $_POST["prefix"] = "gl";
 $_POST["publisher"] = "Restored publisher";
 list($out, $ok) = capture(function() { return(saveConfig()); });
 check("saves a setting whose row is missing, as before the update that adds it", $ok && getConfig()["publisher"] == "Restored publisher");
+$_POST["languages"] = " fr,  pt-BR ";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("saves the other languages, separated by single spaces", $ok && getConfig()["languages"] == "fr pt-BR");
+$_POST["languages"] = "fr ../lang/x";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("refuses other languages that aren't language codes", !$ok && strpos($out, "Other languages must be language codes") !== FALSE && getConfig()["languages"] == "fr pt-BR");
+$_POST["languages"] = "";
+capture(function() { return(saveConfig()); });
 
 section("Readiness report");
 $issues = array();

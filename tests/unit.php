@@ -205,6 +205,53 @@ checkSame("term URIs include it", "https://glossary.example.org/terms/cv/birds#s
   term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
 unset($GLOBALS["ontomasticon"]["pageInfo"]);
 $GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/";
+section("Choosing a language");
+$GLOBALS["ontomasticon"]["config"]["languages"] = "jibberish pt-BR";
+checkSame("the site is offered in its default language and the other languages setting", array("en", "jibberish", "pt-BR"), siteLanguages());
+function languageFor($acceptLanguage, $get = array(), $remembered = null) {
+  if ($acceptLanguage === null) {
+    unset($_SERVER["HTTP_ACCEPT_LANGUAGE"]);
+  } else {
+    $_SERVER["HTTP_ACCEPT_LANGUAGE"] = $acceptLanguage;
+  }
+  $_GET = $get;
+  if ($remembered === null) {
+    unset($_SESSION["lang"]);
+  } else {
+    $_SESSION["lang"] = $remembered;
+  }
+  return(detectLanguage());
+}
+checkSame("the default language when the browser doesn't say", "en", languageFor(null));
+checkSame("the language the browser asks for", "jibberish", languageFor("jibberish"));
+checkSame("skipping languages the site isn't offered in", "pt-BR", languageFor("fr-CH, fr;q=0.9, pt-BR;q=0.8, en;q=0.5"));
+checkSame("most preferred first, whatever the order", "jibberish", languageFor("en;q=0.5, jibberish"));
+checkSame("a language with a region matches the language", "en", languageFor("en-GB"));
+checkSame("and a language matches the language with a region", "pt-BR", languageFor("pt"));
+checkSame("in any case", "pt-BR", languageFor("PT-br"));
+checkSame("not a language refused with q=0", "en", languageFor("jibberish;q=0"));
+checkSame("the default language when the browser accepts any", "en", languageFor("*"));
+checkSame("?lang= overrides the browser", "en", languageFor("jibberish", array("lang" => "en")));
+checkSame("as does a language chosen earlier in the visit", "pt-BR", languageFor("jibberish", array(), "pt-BR"));
+checkSame("unless the site is no longer offered in it", "en", languageFor(null, array(), "fr"));
+languageFor(null, array("lang" => "jibberish"));
+rememberLanguage();
+checkSame("a language chosen with ?lang= is remembered", "jibberish", isset($_SESSION["lang"]) ? $_SESSION["lang"] : null);
+languageFor(null, array("lang" => "xx"));
+rememberLanguage();
+check("unless the site isn't offered in it", !isset($_SESSION["lang"]));
+
+$_SERVER["REQUEST_URI"] = "/cv/birds?lang=en&x=1";
+languageFor(null, array("lang" => "en", "x" => "1"));
+$switcher = languageSwitcher();
+check("the language switcher links to the same page in each other language",
+  strpos($switcher, "<a href='/cv/birds?lang=jibberish&amp;x=1' hreflang='jibberish' lang='jibberish'>jibberish</a>") !== FALSE
+  && strpos($switcher, "<a href='/cv/birds?lang=pt-BR&amp;x=1'") !== FALSE);
+check("and marks the current language without linking it", strpos($switcher, "<strong lang='en'>en</strong>") !== FALSE && strpos($switcher, "lang=en") === FALSE);
+$GLOBALS["ontomasticon"]["config"]["languages"] = "";
+checkSame("there is no switcher when the site has one language", "", languageSwitcher());
+languageFor(null);
+unset($GLOBALS["ontomasticon"]["config"]["languages"]);
 
 section("CSRF tokens");
 $_SESSION = array();
