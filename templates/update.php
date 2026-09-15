@@ -9,7 +9,7 @@ if (!userAllow("administer")) {
   $failed = FALSE;
 
   if (version_compare($version_db, "0.2", "<")) {
-    $sql = "ALTER TABLE `terms` ADD COLUMN `reference` VARCHAR(500) NULL AFTER `broader`;";
+    $sql = "ALTER TABLE ".table("terms")." ADD COLUMN `reference` VARCHAR(500) NULL AFTER `broader`;";
     //1060: the column already exists
     if (mysqli_query($db, $sql) || $db->errno == 1060) {
       $version_db = setDBVersion("0.2");
@@ -23,7 +23,7 @@ if (!userAllow("administer")) {
 
   if (!$failed && version_compare($version_db, "0.3", "<")) {
     //Email addresses must be unique before the constraint can be added
-    $result = dbQuery("SELECT `email` FROM `users` WHERE `email` IS NOT NULL GROUP BY `email` HAVING COUNT(*) > 1;");
+    $result = dbQuery("SELECT `email` FROM ".table("users")." WHERE `email` IS NOT NULL GROUP BY `email` HAVING COUNT(*) > 1;");
     $duplicates = ($result) ? $result->fetch_all(MYSQLI_ASSOC) : array();
     if (count($duplicates) > 0) {
       $failed = TRUE;
@@ -35,9 +35,9 @@ if (!userAllow("administer")) {
     } else {
       $steps = array(
         //Each email address belongs to one user. 1061 (below): the key already exists
-        "ALTER TABLE `users` ADD UNIQUE KEY `email_UNIQUE` (`email`);",
+        "ALTER TABLE ".table("users")." ADD UNIQUE KEY `email_UNIQUE` (`email`);",
         //Failed logins, for rate limiting
-        "CREATE TABLE IF NOT EXISTS `login_attempts` (
+        "CREATE TABLE IF NOT EXISTS ".table("login_attempts")." (
           `id` int(11) NOT NULL AUTO_INCREMENT,
           `email` varchar(255) DEFAULT NULL,
           `ip` varchar(45) DEFAULT NULL,
@@ -47,8 +47,8 @@ if (!userAllow("administer")) {
           KEY `ip_attempted` (`ip`, `attempted`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
         //Deleting terms used to leave other terms pointing at them
-        "UPDATE `terms` AS `t` LEFT JOIN `terms` AS `p` ON `t`.`parent` = `p`.`id` SET `t`.`parent` = NULL WHERE `t`.`parent` IS NOT NULL AND `p`.`id` IS NULL;",
-        "UPDATE `terms` AS `t` LEFT JOIN `terms` AS `b` ON `t`.`broader` = `b`.`id` SET `t`.`broader` = NULL WHERE `t`.`broader` IS NOT NULL AND `b`.`id` IS NULL;"
+        "UPDATE ".table("terms")." AS `t` LEFT JOIN ".table("terms")." AS `p` ON `t`.`parent` = `p`.`id` SET `t`.`parent` = NULL WHERE `t`.`parent` IS NOT NULL AND `p`.`id` IS NULL;",
+        "UPDATE ".table("terms")." AS `t` LEFT JOIN ".table("terms")." AS `b` ON `t`.`broader` = `b`.`id` SET `t`.`broader` = NULL WHERE `t`.`broader` IS NOT NULL AND `b`.`id` IS NULL;"
       );
       foreach ($steps as $sql) {
         if (!mysqli_query($db, $sql) && $db->errno != 1061) {
@@ -68,14 +68,14 @@ if (!userAllow("administer")) {
   if (!$failed && version_compare($version_db, "0.4", "<")) {
     $steps = array(
       //When each term was added and last changed. These aren't known for terms that already exist, so they are left empty.
-      "ALTER TABLE `terms` ADD COLUMN `created` DATETIME NULL AFTER `reference`;",
-      "ALTER TABLE `terms` ADD COLUMN `modified` DATETIME NULL AFTER `created`;",
+      "ALTER TABLE ".table("terms")." ADD COLUMN `created` DATETIME NULL AFTER `reference`;",
+      "ALTER TABLE ".table("terms")." ADD COLUMN `modified` DATETIME NULL AFTER `created`;",
       //The prefix for a vocabulary's terms in RDF
-      "ALTER TABLE `cv` ADD COLUMN `prefix` VARCHAR(20) NULL AFTER `reference`;",
+      "ALTER TABLE ".table("cv")." ADD COLUMN `prefix` VARCHAR(20) NULL AFTER `reference`;",
       //Settings for publishing the vocabularies as linked data
-      "INSERT IGNORE INTO `config` VALUES ('publisher', '');",
-      "INSERT IGNORE INTO `config` VALUES ('license', '');",
-      "INSERT IGNORE INTO `config` VALUES ('prefix', '');"
+      "INSERT IGNORE INTO ".table("config")." VALUES ('publisher', '');",
+      "INSERT IGNORE INTO ".table("config")." VALUES ('license', '');",
+      "INSERT IGNORE INTO ".table("config")." VALUES ('prefix', '');"
     );
     foreach ($steps as $sql) {
       //1060: the column already exists

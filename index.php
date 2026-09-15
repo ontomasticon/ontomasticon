@@ -29,6 +29,11 @@ $db->set_charset("utf8mb4");
 // Load core functions
 require("core/core.php");
 
+if (!validTablePrefix(tablePrefix())) {
+  print("<p>The table prefix in settings/db.php may only use letters A to Z, digits and underscores.</p>");
+  exit;
+}
+
 // Load configuration. Its base_url gives the path the site is installed at, which routing and the session cookie need.
 $GLOBALS["ontomasticon"]["config"] = getConfig($db);
 

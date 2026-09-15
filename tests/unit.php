@@ -13,6 +13,17 @@ checkSame("h() treats NULL as an empty string", "", h(null));
 $_SERVER["REQUEST_URI"] = "/admin/term/edit/x'><script>";
 checkSame("form actions are escaped", "/admin/term/edit/x&#039;&gt;&lt;script&gt;", formAction());
 
+section("Table names");
+checkSame("tables have no prefix by default", "`terms`", table("terms"));
+$table_prefix = "site_";
+checkSame("with a table prefix, table names start with it", "`site_terms`", table("terms"));
+checkSame("SQL files get the prefix on the tables they create and fill, and nowhere else",
+  "DROP TABLE IF EXISTS `site_config`;\nCREATE TABLE `site_cv` (\n  `cv` varchar(50)\n);\nINSERT INTO `site_users` (email) VALUES ('terms');",
+  prefixTables("DROP TABLE IF EXISTS `config`;\nCREATE TABLE `cv` (\n  `cv` varchar(50)\n);\nINSERT INTO users (email) VALUES ('terms');"));
+check("a prefix may use letters, digits and underscores, or be empty", validTablePrefix("Site_2") && validTablePrefix(""));
+check("but nothing that could change the SQL", !validTablePrefix("a-b") && !validTablePrefix("x`; DROP") && !validTablePrefix("site\n"));
+$table_prefix = null;
+
 section("IP address ranges");
 check("IPv4 address inside a /16", ipInRanges("192.168.1.5", array("192.168.0.0/16")));
 check("IPv4 address outside a /16", !ipInRanges("192.169.0.1", array("192.168.0.0/16")));
