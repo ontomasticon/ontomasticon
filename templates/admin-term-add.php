@@ -27,6 +27,13 @@ if (!userAllow("edit-terms")) {
     <label for="opaque"><?php print t("Opaque"); ?></label><br/>
     <input type="checkbox" id="opaque" name="opaque" value="opaque">
        <br/><br/>
+    <label for="type-concept"><?php print t("Type"); ?></label><br/>
+    <small><?php print t("A concept is a term or a value, such as a type of call. A property is a characteristic that is measured or recorded, such as pulse duration. A class is a kind of thing, such as a syllable."); ?></small><br/>
+    <?php foreach (termTypeLabels() as $value => $label) { ?>
+      <input type="radio" id="type-<?php print $value; ?>" name="type" value="<?php print $value; ?>" <?php print val2check("concept", $value); ?>>
+      <label for="type-<?php print $value; ?>"><?php print t($label); ?></label><br/>
+    <?php } ?>
+    <br/>
     <label for="nocv"><?php print t("Controlled vocabulary"); ?></label><br/>
     <input type="radio" id="nocv" name="cv" value="none">
     <label for="nocv"><?php print t("None"); ?></label><br/>

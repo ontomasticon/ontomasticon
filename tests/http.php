@@ -224,6 +224,14 @@ check("a browser's Accept header gets the vocabulary page", hasHeader($headers, 
 list(, , $body) = httpRequest("GET", "/ping", null, $asJSONLD);
 checkSame("other addresses aren't affected", "pong", $body);
 
+section("HTTP: term types");
+$db->query("UPDATE ".table("terms")." SET `type` = 'property' WHERE `shortname` = 'agreement_song';");
+list(, , $body) = httpRequest("GET", "/");
+check("a property's type is shown with it", strpos($body, '<p class="term-type">Property</p>') !== FALSE);
+list(, , $body) = httpRequest("GET", "/api/term/?shortname=agreement_song&format=jsonld");
+$concept = json_decode($body, TRUE);
+checkSame("and its JSON-LD gives both of its types", array("skos:Concept", "rdf:Property"), is_array($concept) ? $concept["@type"] : null);
+
 section("HTTP: Turtle");
 $asTurtle = array("Accept: text/turtle");
 list($status, $headers, $body) = httpRequest("GET", "/acoustic_allometry", null, $asTurtle);
