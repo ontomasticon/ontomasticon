@@ -522,9 +522,9 @@ checkSame("and treats anything else, including no type, as a concept", array("co
 checkSame("a term saved before types existed is a concept", "concept", Term::fromRow(array("id" => 1, "shortname" => "old"))->type);
 $duration = testTerm(array("id" => 30, "shortname" => "Duration", "name" => "Duration", "description" => "How long.", "type" => "property"));
 $pulseDuration = testTerm(array("id" => 31, "shortname" => "PulseDuration", "name" => "Pulse Duration", "description" => "How long a pulse lasts.",
-  "type" => "property", "broader" => 30), array("broader" => $duration));
+  "type" => "property", "datatype" => "decimal", "broader" => 30), array("broader" => $duration));
 $callDuration = testTerm(array("id" => 32, "shortname" => "CallDuration", "name" => "Call Duration", "description" => "How long a call lasts.",
-  "type" => "property", "broader" => 2), array("broader" => $premating));
+  "type" => "property", "datatype" => "decimal", "broader" => 2), array("broader" => $premating));
 $component = testTerm(array("id" => 33, "shortname" => "Component", "name" => "Call component", "description" => "A part of a call.",
   "cv" => "components", "type" => "class"));
 $syllable = testTerm(array("id" => 34, "shortname" => "Syllable", "name" => "Syllable", "description" => "A unit of a call.",
@@ -546,3 +546,52 @@ foreach (readinessIssues(array($pulseDuration, $callDuration, $syllable), array(
   $typeIssues[$issue["id"]] = array_column($issue["items"], "label");
 }
 checkSame("the readiness report lists only a term under a broader term of a different type", array("type-hierarchy" => array("CallDuration")), $typeIssues);
+
+section("Value ranges");
+checkSame("properties can take numbers, whole numbers, text, yes or no, or dates",
+  array("decimal", "integer", "string", "boolean", "date"), array_keys(termDatatypes()));
+checkSame("the edit form shows values from a vocabulary", "cv:spm", termValuesChoice(array("range_cv" => "spm", "datatype" => null)));
+checkSame("or a datatype", "datatype:boolean", termValuesChoice(array("range_cv" => null, "datatype" => "boolean")));
+checkSame("or neither", "", termValuesChoice(array("id" => 1)));
+$GLOBALS["ontomasticon"]["CVs"] = array("spm" => array("shortname" => "spm", "name" => "Sound Production Method", "prefix" => "spm"));
+function valuesFor($type, $choice) {
+  $_POST = array("values" => $choice);
+  return(capture(function() use ($type) { return(termValues($type)); }));
+}
+checkSame("a property's values can come from one of the site's vocabularies", array("", array("range_cv" => "spm", "datatype" => null)), valuesFor("property", "cv:spm"));
+checkSame("or be a datatype", array("", array("range_cv" => null, "datatype" => "boolean")), valuesFor("property", "datatype:boolean"));
+checkSame("or not be stated", array("", array("range_cv" => null, "datatype" => null)), valuesFor("property", ""));
+checkSame("other types of term have no values, whatever the form says", array("", array("range_cv" => null, "datatype" => null)), valuesFor("class", "cv:spm"));
+list($out, $values) = valuesFor("property", "cv:medium");
+check("values from a vocabulary the site doesn't have are refused", $values === null && strpos($out, "values must come from") !== FALSE);
+list($out, $values) = valuesFor("property", "datatype:colour");
+check("and so is a datatype it doesn't have", $values === null);
+$_POST = array();
+
+$stridulation = testTerm(array("id" => 40, "shortname" => "StridulationInFlight", "name" => "Stridulation In Flight",
+  "description" => "Whether it stridulates in flight.", "type" => "property", "datatype" => "boolean"));
+$method = testTerm(array("id" => 41, "shortname" => "SoundProductionMethod", "name" => "Sound Production Method",
+  "description" => "How the sound is made.", "type" => "property", "range_cv" => "spm"));
+$ld = termJSONLD($stridulation);
+checkSame("a property with a datatype has it as its range", array("@id" => "http://www.w3.org/2001/XMLSchema#boolean"), $ld["rdfs:range"]);
+check("and no note", !isset($ld["skos:scopeNote"]));
+check("which Turtle writes as a full IRI", strpos(turtleOutput($ld), "    rdfs:range <http://www.w3.org/2001/XMLSchema#boolean> ;") !== FALSE);
+$ld = termJSONLD($method);
+checkSame("a property whose values come from a vocabulary says so in a note",
+  "Values come from the Sound Production Method controlled vocabulary: https://glossary.example.org/cv/spm", $ld["skos:scopeNote"]);
+check("rather than as a range", !isset($ld["rdfs:range"]));
+$ld = termJSONLD(testTerm(array("id" => 42, "shortname" => "Oddity", "name" => "Oddity", "datatype" => "decimal", "range_cv" => "spm")));
+check("a term that isn't a property has neither, even if the database gives it values", !isset($ld["rdfs:range"]) && !isset($ld["skos:scopeNote"]));
+
+$withoutValues = testTerm(array("id" => 43, "shortname" => "PulseCount", "name" => "Pulse Count", "description" => "How many pulses.", "type" => "property"));
+$missingVocabulary = testTerm(array("id" => 44, "shortname" => "SoundPropagationMedium", "name" => "Sound Propagation Medium",
+  "description" => "What the sound travels through.", "type" => "property", "range_cv" => "medium"));
+$conceptWithValues = testTerm(array("id" => 45, "shortname" => "Echeme", "name" => "Echeme", "description" => "A group of syllables.", "datatype" => "decimal"));
+$valueIssues = array();
+foreach (readinessIssues(array($stridulation, $method, $withoutValues, $missingVocabulary, $conceptWithValues), $GLOBALS["ontomasticon"]["CVs"],
+  array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "gl")) as $issue) {
+  $valueIssues[$issue["id"]] = array_column($issue["items"], "label");
+}
+checkSame("the readiness report lists properties without values, values from a missing vocabulary, and values on a term that isn't a property",
+  array("values" => array("PulseCount"), "values-vocabulary" => array("SoundPropagationMedium"), "values-not-property" => array("Echeme")), $valueIssues);
+unset($GLOBALS["ontomasticon"]["CVs"]);

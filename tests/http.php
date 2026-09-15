@@ -231,6 +231,13 @@ check("a property's type is shown with it", strpos($body, '<p class="term-type">
 list(, , $body) = httpRequest("GET", "/api/term/?shortname=agreement_song&format=jsonld");
 $concept = json_decode($body, TRUE);
 checkSame("and its JSON-LD gives both of its types", array("skos:Concept", "rdf:Property"), is_array($concept) ? $concept["@type"] : null);
+$db->query("UPDATE ".table("terms")." SET `datatype` = 'decimal' WHERE `shortname` = 'agreement_song';");
+list(, , $body) = httpRequest("GET", "/");
+check("a property shows what values it takes", strpos($body, '<p class="term-values">Values: Numbers</p>') !== FALSE);
+list(, , $body) = httpRequest("GET", "/api/term/?shortname=agreement_song&format=jsonld");
+$concept = json_decode($body, TRUE);
+checkSame("and its JSON-LD gives the datatype as its range", array("@id" => "http://www.w3.org/2001/XMLSchema#decimal"),
+  (is_array($concept) && isset($concept["rdfs:range"])) ? $concept["rdfs:range"] : null);
 
 section("HTTP: Turtle");
 $asTurtle = array("Accept: text/turtle");

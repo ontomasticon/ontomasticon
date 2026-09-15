@@ -102,6 +102,16 @@ function termNode($term) {
   if (isset($rdfTypes[$term->type])) {
     $node["rdfs:isDefinedBy"] = $scheme;
   }
+  //Where a property's values come from. A datatype is its range. There is no agreed way to say in RDF that values come
+  //from a vocabulary, so that is a note people can read, in English whatever the visitor's language.
+  $datatypes = termDatatypes();
+  if ($term->type == "property" && isset($datatypes[(string)$term->datatype])) {
+    $node["rdfs:range"] = array("@id" => $datatypes[$term->datatype]["iri"]);
+  } elseif ($term->type == "property" && $term->rangeCV != null) {
+    $CVs = isset($GLOBALS["ontomasticon"]["CVs"]) ? $GLOBALS["ontomasticon"]["CVs"] : array();
+    $name = (isset($CVs[$term->rangeCV]) && $CVs[$term->rangeCV]["name"] != "") ? $CVs[$term->rangeCV]["name"] : $term->rangeCV;
+    $node["skos:scopeNote"] = "Values come from the ".$name." controlled vocabulary: ".(new Vocabulary($term->rangeCV))->uri();
+  }
   $broader = $term->broader();
   if ($broader != null) {
     $node["skos:broader"] = jsonLDLink($broader);

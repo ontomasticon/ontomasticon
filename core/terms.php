@@ -258,6 +258,49 @@ function termType($type) {
   return(in_array($type, termTypes(), TRUE) ? $type : "concept");
 }
 
+//The datatypes a property's values can have, with their names and XML Schema datatypes
+function termDatatypes() {
+  return(array(
+    "decimal" => array("label" => "Numbers", "iri" => "http://www.w3.org/2001/XMLSchema#decimal"),
+    "integer" => array("label" => "Whole numbers", "iri" => "http://www.w3.org/2001/XMLSchema#integer"),
+    "string" => array("label" => "Text", "iri" => "http://www.w3.org/2001/XMLSchema#string"),
+    "boolean" => array("label" => "Yes or no", "iri" => "http://www.w3.org/2001/XMLSchema#boolean"),
+    "date" => array("label" => "Dates", "iri" => "http://www.w3.org/2001/XMLSchema#date")
+  ));
+}
+
+//The Values choice on a term form for a row of the terms table: "cv:" or "datatype:" followed by a name, or "" for neither
+function termValuesChoice($row) {
+  if (isset($row["range_cv"]) && $row["range_cv"] != "") {
+    return("cv:".$row["range_cv"]);
+  }
+  if (isset($row["datatype"]) && $row["datatype"] != "") {
+    return("datatype:".$row["datatype"]);
+  }
+  return("");
+}
+
+//Where the values of a term of $type come from, from the Values choice on a term form, as array("range_cv" => a
+//vocabulary's shortname or NULL, "datatype" => one of termDatatypes() or NULL). Only properties have values, so other
+//terms have neither. Prints an error and returns NULL if the choice is a vocabulary or datatype the site doesn't have.
+function termValues($type) {
+  $none = array("range_cv" => null, "datatype" => null);
+  $choice = (isset($_POST["values"]) && is_string($_POST["values"])) ? trim($_POST["values"]) : "";
+  if ($type != "property" || $choice == "") {
+    return($none);
+  }
+  $parts = explode(":", $choice, 2);
+  $CVs = isset($GLOBALS["ontomasticon"]["CVs"]) ? $GLOBALS["ontomasticon"]["CVs"] : array();
+  if (count($parts) == 2 && $parts[0] == "cv" && isset($CVs[$parts[1]])) {
+    return(array("range_cv" => $parts[1], "datatype" => null));
+  }
+  if (count($parts) == 2 && $parts[0] == "datatype" && isset(termDatatypes()[$parts[1]])) {
+    return(array("range_cv" => null, "datatype" => $parts[1]));
+  }
+  printError(t("Not saved. The values must come from a controlled vocabulary or a datatype the site has."));
+  return(null);
+}
+
 function editTerm() {
   $shortname = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
   $current = getTerm($shortname);
@@ -285,8 +328,12 @@ function editTerm() {
   }
 
   $type = termType(isset($_POST["type"]) ? $_POST["type"] : "concept");
+  $values = termValues($type);
+  if ($values === null) {
+    return(FALSE);
+  }
 
-  $sql  = "UPDATE ".table("terms")." SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, `type` = ?, ";
+  $sql  = "UPDATE ".table("terms")." SET `name` = ?, `description` = ?, `language` = ?, `opaque` = ?, `type` = ?, `range_cv` = ?, `datatype` = ?, ";
   $sql .= "`invalid_reason` = ?, `cv` = ?, `parent` = ?, `broader` = ?, `reference` = ?, `modified` = UTC_TIMESTAMP() ";
   $sql .= "WHERE `shortname` = ?;";
   return(reportSaved(dbQuery($sql, array(
@@ -295,6 +342,8 @@ function editTerm() {
     $language,
     $opaque,
     $type,
+    $values["range_cv"],
+    $values["datatype"],
     ($invalid == "") ? null : $invalid,
     ($cv == "") ? null : $cv,
     $relations["parent"],
@@ -340,9 +389,13 @@ function addTerm() {
   }
 
   $type = termType(isset($_POST["type"]) ? $_POST["type"] : "concept");
+  $values = termValues($type);
+  if ($values === null) {
+    return(FALSE);
+  }
 
-  $sql  = "INSERT INTO ".table("terms")." (`shortname`, `name`, `description`, `language`, `opaque`, `type`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`, `created`, `modified`) ";
-  $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP());";
+  $sql  = "INSERT INTO ".table("terms")." (`shortname`, `name`, `description`, `language`, `opaque`, `type`, `range_cv`, `datatype`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`, `created`, `modified`) ";
+  $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP());";
   return(reportSaved(dbQuery($sql, array(
     $shortname,
     $name,
@@ -350,6 +403,8 @@ function addTerm() {
     $language,
     $opaque,
     $type,
+    $values["range_cv"],
+    $values["datatype"],
     ($invalid == "") ? null : $invalid,
     ($cv == "") ? null : $cv,
     $relations["parent"],

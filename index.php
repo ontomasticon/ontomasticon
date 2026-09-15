@@ -2,9 +2,9 @@
 // Ontomasticon: a simple, lightweight, PHP-based ontology browser.
 // Department of Information Retrieval
 
-//Codebase version. Quoted, as 0.4.1 isn't a number; installs before 0.3 can only read an unquoted
-//number here when checking for updates, so they won't be told about this version.
-$version = "0.4.1";
+//Codebase version. Quoted, as versions such as 0.4.2 aren't numbers; installs before 0.3 can only read an
+//unquoted number here when checking for updates, so they won't be told about this version.
+$version = "0.4.2";
 
 //Query results are checked where they are used, so stop mysqli throwing exceptions (the default from PHP 8.1)
 mysqli_report(MYSQLI_REPORT_OFF);

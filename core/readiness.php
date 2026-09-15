@@ -26,7 +26,10 @@ function readinessIssues($terms, $vocabularies, $config) {
     "uri-clash" => t("Terms whose URI clashes with another address on the site, so it doesn't reach the term"),
     "utf8" => t("Terms with text that isn't valid UTF-8, which is shown as a replacement character in RDF"),
     "synonym" => t("Synonyms without a parent term, so they don't say which term replaces them"),
-    "type-hierarchy" => t("Terms whose broader term is a different type, such as a property under a concept")
+    "type-hierarchy" => t("Terms whose broader term is a different type, such as a property under a concept"),
+    "values" => t("Properties that don't say what values they take"),
+    "values-vocabulary" => t("Properties whose values come from a controlled vocabulary that doesn't exist"),
+    "values-not-property" => t("Terms that say what values they take, but aren't properties")
   );
   $items = array_fill_keys(array_keys($problems), array());
   $configLink = "/admin/config";
@@ -85,6 +88,16 @@ function readinessIssues($terms, $vocabularies, $config) {
     }
     if ($term->broader() != null && $term->broader()->type != $term->type) {
       $items["type-hierarchy"][] = $item;
+    }
+    if ($term->type == "property" && $term->rangeCV == null && !isset(termDatatypes()[(string)$term->datatype])) {
+      $items["values"][] = $item;
+    }
+    if ($term->type == "property" && $term->rangeCV != null && !isset($vocabularies[$term->rangeCV])) {
+      $items["values-vocabulary"][] = $item;
+    }
+    //Only possible by changing the database directly, as saving a term clears values unless it is a property
+    if ($term->type != "property" && ($term->rangeCV != null || $term->datatype != null)) {
+      $items["values-not-property"][] = $item;
     }
   }
 

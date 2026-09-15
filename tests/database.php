@@ -83,6 +83,7 @@ check("vocabularies have a prefix column", $db->query("SELECT `prefix` FROM ".ta
 check("the linked data settings exist", count(array_intersect(array("publisher", "license", "prefix"), array_keys(getConfig()))) == 3);
 check("term languages can be 35 characters long", !termLanguageColumnTooNarrow());
 check("terms have a type column", $db->query("SELECT `type` FROM ".table("terms")." LIMIT 1;") !== FALSE);
+check("and columns for where a property's values come from", $db->query("SELECT `range_cv`, `datatype` FROM ".table("terms")." LIMIT 1;") !== FALSE);
 
 section("Adding terms");
 termForm(array("shortname" => "sound", "name" => "Sound"));
@@ -90,12 +91,20 @@ list($out, $ok) = capture(function() { return(addTerm()); });
 check("adds a term", $ok && termRow("sound") != null);
 check("records when the term was added", termRow("sound")["created"] !== null && termRow("sound")["modified"] === termRow("sound")["created"]);
 checkSame("a term is a concept unless it is given another type", "concept", termRow("sound")["type"]);
-termForm(array("shortname" => "pulse_duration", "name" => "Pulse duration", "type" => "property"));
+termForm(array("shortname" => "pulse_duration", "name" => "Pulse duration", "type" => "property", "values" => "datatype:decimal"));
 capture(function() { return(addTerm()); });
 checkSame("saves a term's type", "property", termRow("pulse_duration")["type"]);
-termForm(array("shortname" => "odd_type", "name" => "Odd type", "type" => "widget"));
+checkSame("and what values a property takes", array(null, "decimal"), array(termRow("pulse_duration")["range_cv"], termRow("pulse_duration")["datatype"]));
+termForm(array("shortname" => "odd_type", "name" => "Odd type", "type" => "widget", "values" => "datatype:decimal"));
 capture(function() { return(addTerm()); });
-checkSame("and saves a type it doesn't know as a concept", "concept", termRow("odd_type")["type"]);
+checkSame("saves a type it doesn't know as a concept", "concept", termRow("odd_type")["type"]);
+checkSame("without values, which only properties have", null, termRow("odd_type")["datatype"]);
+termForm(array("shortname" => "odd_values", "name" => "Odd values", "type" => "property", "values" => "cv:nowhere"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("refuses values from a controlled vocabulary the site doesn't have", !$ok && strpos($out, "values must come from") !== FALSE && termRow("odd_values") == null);
+termForm(array("shortname" => "odd_values", "name" => "Odd values", "type" => "property", "values" => "datatype:colour"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("or a datatype it doesn't have", !$ok && termRow("odd_values") == null);
 dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` IN ('pulse_duration', 'odd_type');");
 termForm(array("shortname" => "sound", "name" => "Duplicate"));
 list($out, $ok) = capture(function() { return(addTerm()); });
@@ -331,6 +340,19 @@ check("editing a vocabulary changes its namespace prefix", $ok && getCVs()["bird
 $_POST["prefix"] = "has space";
 list($out, $ok) = capture(function() { return(editCV()); });
 check("but refuses one that can't be used", !$ok && getCVs()["birds"]["prefix"] == "aves");
+termForm(array("shortname" => "wingbeat", "name" => "Wingbeat", "type" => "property", "values" => "cv:birds"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+checkSame("a property's values can come from a controlled vocabulary", "birds", $ok ? termRow("wingbeat")["range_cv"] : null);
+$wingbeat = termJSONLD(Term::find("wingbeat"));
+check("which its JSON-LD gives as a note naming the vocabulary",
+  isset($wingbeat["skos:scopeNote"]) && strpos($wingbeat["skos:scopeNote"], "Birds controlled vocabulary: https://glossary.example.org/cv/birds") !== FALSE);
+$GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "wingbeat";
+termForm(array("name" => "Wingbeat", "type" => "concept", "values" => "cv:birds"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("editing a term so it isn't a property clears where its values come from", $ok && termRow("wingbeat")["range_cv"] === null);
+termForm(array("name" => "Wingbeat", "type" => "property", "values" => "cv:birds"));
+capture(function() { return(editTerm()); });
+$GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "birds";
 termForm(array("shortname" => "redbreast", "name" => "Redbreast", "invalid" => "Synonym", "parent" => "robin"));
 capture(function() { return(addTerm()); });
 termForm(array("shortname" => "erithacus", "name" => "Erithacus", "cv" => "birds", "invalid" => "Synonym", "parent" => "robin"));
@@ -342,6 +364,8 @@ dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'redbreast';");
 list($out, $ok) = capture(function() { return(deleteCV()); });
 check("deletes the vocabulary and its terms, including its synonyms", $ok && !array_key_exists("birds", getCVs()) && termRow("robin") == null && termRow("erithacus") == null);
 checkSame("clears links from other terms to the deleted terms", null, termRow("wren_song")["parent"]);
+checkSame("and clears values that came from the vocabulary", null, termRow("wingbeat")["range_cv"]);
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'wingbeat';");
 
 section("Site configuration");
 $_POST = array("site_name" => "Glossary", "author" => "A. Author", "publisher" => "Natural History Museum", "default_lang" => "en",
@@ -478,7 +502,8 @@ $out = runUpdate();
 check("runs the 0.3 step once the duplicate is removed", strpos($out, "updated to version 0.3") !== FALSE);
 check("and then the 0.4 step", strpos($out, "updated to version 0.4</p>") !== FALSE);
 check("and the 0.4.1 step", strpos($out, "updated to version 0.4.1</p>") !== FALSE);
-checkSame("leaving the database at 0.4.1", "0.4.1", (string)getConfig()["version_db"]);
+check("and the 0.4.2 step", strpos($out, "updated to version 0.4.2</p>") !== FALSE);
+checkSame("leaving the database at 0.4.2", "0.4.2", (string)getConfig()["version_db"]);
 check("email addresses must now be unique", !$db->query("INSERT INTO ".table("users")." (`email`) VALUES ('twice@example.org');"));
 check("creates the login_attempts table", $db->query("SELECT 1 FROM ".table("login_attempts")." LIMIT 1;") !== FALSE);
 $orphan = termRow("orphan");
@@ -489,6 +514,8 @@ check("adds the vocabulary prefix column", $db->query("SELECT `prefix` FROM ".ta
 checkSame("and the linked data settings, empty", array("", "", ""),
   array(getConfig()["publisher"], getConfig()["license"], getConfig()["prefix"]));
 check("adds the term type column, making existing terms concepts", termRow("orphan")["type"] === "concept");
+check("adds the columns for where a property's values come from, empty",
+  array_key_exists("range_cv", termRow("orphan")) && termRow("orphan")["range_cv"] === null && termRow("orphan")["datatype"] === null);
 check("widens the language column for longer language tags", !termLanguageColumnTooNarrow());
 check("running it again changes nothing", strpos(runUpdate(), "No updates required") !== FALSE);
 $db->query("ALTER TABLE ".table("terms")." MODIFY COLUMN `language` VARCHAR(5) DEFAULT NULL;");

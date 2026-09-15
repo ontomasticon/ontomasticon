@@ -11,6 +11,15 @@
   if ($termType != "concept") {
     print '<p class="term-type">'.h(t(termTypeLabels()[$termType])).'</p>';
   }
+  //Where a property's values come from
+  $termRow = $GLOBALS["ontomasticon"]["term"];
+  $datatypes = termDatatypes();
+  if ($termType == "property" && isset($termRow["datatype"]) && isset($datatypes[$termRow["datatype"]])) {
+    print '<p class="term-values">'.h(t("Values")).": ".h(t($datatypes[$termRow["datatype"]]["label"])).'</p>';
+  } elseif ($termType == "property" && isset($termRow["range_cv"]) && isset($GLOBALS["ontomasticon"]["CVs"][$termRow["range_cv"]])) {
+    $valuesCV = $GLOBALS["ontomasticon"]["CVs"][$termRow["range_cv"]];
+    print '<p class="term-values">'.h(t("Values")).": ".l($valuesCV["name"], "/cv/".$valuesCV["shortname"]).'</p>';
+  }
   ?>
   <p class="term-language"><?php print h($GLOBALS["ontomasticon"]["term"]["language"]); ?></p>
   <p class="term-description"><?php print $GLOBALS["ontomasticon"]["term"]["description"]; ?></p>
