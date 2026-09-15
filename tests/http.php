@@ -120,7 +120,20 @@ check("and its terms under a heading for their letter, in alphabetical order",
   && strpos($body, '<h2 class="glossary-letter" id="glossary:A">A</h2>') < strpos($body, 'id="acoustic_allometry"')
   && strpos($body, 'id="acoustic_allometry"') < strpos($body, '<h2 class="glossary-letter" id="glossary:O">O</h2>')
   && strpos($body, '<h2 class="glossary-letter" id="glossary:O">O</h2>') < strpos($body, "<h3>Opaque term"));
+$db->query("UPDATE ".table("terms")." SET `acronym` = 'AAL' WHERE `shortname` = 'acoustic_allometry';");
+list(, , $body) = httpRequest("GET", "/");
+check("a glossary lists each acronym as well, pointing to its term",
+  strpos($body, '<p class="glossary-see">AAL, see <a href="#acoustic_allometry">Acoustic allometry</a></p>') !== FALSE);
+check("and the term gives its acronym", strpos($body, '<p class="term-acronym">Acronym: AAL</p>') !== FALSE);
+$ld = json_decode(httpRequest("GET", "/api/term/?shortname=acoustic_allometry&format=jsonld")[2], TRUE);
+checkSame("and its JSON-LD gives its name and acronym as lexical entries", array("https://glossary.example.org/acoustic_allometry",
+  "https://glossary.example.org/acoustic_allometry#entry", "https://glossary.example.org/acoustic_allometry#acronym"),
+  (is_array($ld) && isset($ld["@graph"])) ? array_column($ld["@graph"], "@id") : null);
 $db->query("DELETE FROM ".table("config")." WHERE `key` = 'glossary_display';");
+list(, , $body) = httpRequest("GET", "/");
+check("a site that isn't a glossary doesn't list acronyms or show them with terms",
+  strpos($body, "glossary-see") === FALSE && strpos($body, "term-acronym") === FALSE);
+$db->query("UPDATE ".table("terms")." SET `acronym` = NULL WHERE `shortname` = 'acoustic_allometry';");
 list(, , $body) = httpRequest("GET", "/ping");
 checkSame("ping", "pong", $body);
 list(, , $body) = httpRequest("GET", "/cv");

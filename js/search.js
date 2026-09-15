@@ -73,7 +73,8 @@
 
       var name = document.createElement("span");
       name.className = "term-search-name";
-      name.textContent = term.name;
+      //A term's acronym follows its name, as a visitor may have searched for it
+      name.textContent = term.acronym ? term.name + " (" + term.acronym + ")" : term.name;
       item.appendChild(name);
 
       var details = [];

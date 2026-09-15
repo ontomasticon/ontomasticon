@@ -721,10 +721,10 @@ checkSame("the readiness report lists properties without values, values from a m
   array("values" => array("PulseCount"), "values-vocabulary" => array("SoundPropagationMedium"), "values-not-property" => array("Echeme")), $valueIssues);
 unset($GLOBALS["ontomasticon"]["CVs"]);
 
-section("Glossary display");
-check("is off unless the site turns it on", !glossaryDisplay());
+section("Glossaries");
+check("a site isn't a glossary unless it says so", !isGlossary());
 $GLOBALS["ontomasticon"]["config"]["glossary_display"] = "1";
-check("and on when it does", glossaryDisplay());
+check("and is when it does", isGlossary());
 unset($GLOBALS["ontomasticon"]["config"]["glossary_display"]);
 $groups = glossaryGroups(array(
   array("shortname" => "zebra_finch", "name" => "zebra finch"),
@@ -743,6 +743,64 @@ check("links to the letters that have terms", strpos($index, '<a href="#glossary
 check("and shows the others without a link", strpos($index, '<span class="glossary-index-empty">B</span>') !== FALSE && strpos($index, 'href="#glossary:B"') === FALSE);
 checkSame("lists every letter from A to Z", 27, preg_match_all('/>[A-Z#]</', $index));
 check("leaves out # when no term is filed under it", strpos(glossaryIndex(array("A" => array())), "#</") === FALSE);
+$groups = glossaryGroups(glossaryEntries(array(
+  array("id" => 50, "shortname" => "passive_acoustic_monitoring", "name" => "Passive acoustic monitoring", "acronym" => "PAM"),
+  array("id" => 51, "shortname" => "echo", "name" => "Echo", "acronym" => "ECHO"),
+  array("id" => 52, "shortname" => "sonar", "name" => "Sonar", "acronym" => null)
+)));
+checkSame("lists a term's acronym under its own letter as well, pointing to the term", array("PAM", "passive_acoustic_monitoring"),
+  array($groups["P"][0]["name"], $groups["P"][0]["see"]["shortname"]));
+checkSame("but not an acronym that is just the term's name", array("echo"), array_column($groups["E"], "shortname"));
+checkSame("a term without an acronym is listed once", 1, count($groups["S"]));
+checkSame("an acronym is too long for the database above 50 characters", array(null, TRUE),
+  array(termAcronymError(str_repeat("A", 50)), termAcronymError(str_repeat("A", 51)) !== null));
+
+$monitoring = testTerm(array("id" => 50, "shortname" => "passive_acoustic_monitoring", "name" => "Passive acoustic monitoring", "acronym" => "PAM"));
+$ld = termJSONLD($monitoring);
+checkSame("a term's acronym is an alternative label for it", array(array("@value" => "PAM", "@language" => "en")), $ld["skos:altLabel"]);
+checkSame("and another name for it in schema.org", array(array("@value" => "PAM", "@language" => "en")), schemaOrgTerm($monitoring)["alternateName"]);
+check("a site that isn't a glossary gives the concept alone, without OntoLex",
+  $ld["@id"] === "https://glossary.example.org/passive_acoustic_monitoring" && !isset($ld["@graph"]) && !isset($ld["@context"]["ontolex"]));
+checkSame("a word's address is the term's URI with the word as its fragment", "https://glossary.example.org/passive_acoustic_monitoring#acronym",
+  $monitoring->entryURI("acronym"));
+checkSame("or added after a colon to the fragment of a term in a vocabulary", "https://glossary.example.org/cv/callType#AgreementSong:entry",
+  $song->entryURI("entry"));
+
+$GLOBALS["ontomasticon"]["config"]["glossary_display"] = "1";
+$ld = termJSONLD($monitoring);
+checkSame("on a glossary, a term is a graph of its concept followed by lexical entries for its name and acronym", array(
+  "https://glossary.example.org/passive_acoustic_monitoring", "https://glossary.example.org/passive_acoustic_monitoring#entry",
+  "https://glossary.example.org/passive_acoustic_monitoring#acronym"
+), isset($ld["@graph"]) ? array_column($ld["@graph"], "@id") : null);
+checkSame("using OntoLex and LexInfo", array("http://www.w3.org/ns/lemon/ontolex#", "http://www.lexinfo.net/ontology/3.0/lexinfo#"),
+  array($ld["@context"]["ontolex"], $ld["@context"]["lexinfo"]));
+$entry = $ld["@graph"][1];
+checkSame("the name's entry is written as the name, and denotes the concept", array("ontolex:LexicalEntry",
+  array("@type" => "ontolex:Form", "ontolex:writtenRep" => array("@value" => "Passive acoustic monitoring", "@language" => "en")),
+  array("@id" => "https://glossary.example.org/passive_acoustic_monitoring")
+), array($entry["@type"], $entry["ontolex:canonicalForm"], $entry["ontolex:denotes"]));
+checkSame("as the preferred term, and the full form of the acronym",
+  array(array("@id" => "http://www.lexinfo.net/ontology/3.0/lexinfo#preferredTerm"), array("@id" => "http://www.lexinfo.net/ontology/3.0/lexinfo#fullForm")),
+  array($entry["lexinfo:normativeAuthorization"], $entry["lexinfo:termType"]));
+$entry = $ld["@graph"][2];
+checkSame("the acronym's entry is an acronym for the name's entry, and denotes the same concept", array(
+  array("@id" => "http://www.lexinfo.net/ontology/3.0/lexinfo#acronym"), array("@id" => "https://glossary.example.org/passive_acoustic_monitoring#entry"),
+  array("@id" => "https://glossary.example.org/passive_acoustic_monitoring")
+), array($entry["lexinfo:termType"], $entry["lexinfo:acronymFor"], $entry["ontolex:denotes"]));
+$entry = termJSONLD($synonym)["@graph"][1];
+checkSame("a synonym's name is an admitted term for the concept it is a synonym of", array("https://glossary.example.org/cv/callType#AttractionSong:entry",
+  array("@id" => "http://www.lexinfo.net/ontology/3.0/lexinfo#admittedTerm"), array("@id" => "https://glossary.example.org/cv/callType#AgreementSong")
+), array($entry["@id"], $entry["lexinfo:normativeAuthorization"], $entry["ontolex:denotes"]));
+check("with no term type, as it has no acronym", !isset($entry["lexinfo:termType"]));
+$turtle = turtleOutput(termJSONLD($monitoring));
+check("Turtle gives a word's written form as a blank node", strpos($turtle, "\n".'    ontolex:canonicalForm [ a ontolex:Form ; ontolex:writtenRep "PAM"@en ] ;'."\n") !== FALSE);
+check("and declares the prefixes", strpos($turtle, "@prefix lexinfo: <http://www.lexinfo.net/ontology/3.0/lexinfo#> .\n") !== FALSE
+  && strpos($turtle, "@prefix ontolex: <http://www.w3.org/ns/lemon/ontolex#> .\n") !== FALSE);
+$ld = vocabularyJSONLD($callType, array($premating, $song, $synonym, $response));
+checkSame("a glossary's vocabulary gives its terms, then an entry for each of their names", array(9, "https://glossary.example.org/cv/callType#PrematingSong:entry"),
+  array(count($ld["@graph"]), $ld["@graph"][5]["@id"]));
+checkSame("with the same top concepts", 2, count($ld["@graph"][0]["skos:hasTopConcept"]));
+unset($GLOBALS["ontomasticon"]["config"]["glossary_display"]);
 
 section("Search");
 checkSame("a search matches text containing it", "%echo%", likePattern("echo"));

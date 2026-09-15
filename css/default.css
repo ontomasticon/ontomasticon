@@ -293,7 +293,7 @@ pre {
   font-weight: 600;
 }
 
-/* Glossary display: links to each letter, and a heading for each */
+/* Glossary: links to each letter, a heading for each, and acronyms pointing to their terms */
 
 .glossary-index {
   display: flex;
@@ -319,6 +319,11 @@ pre {
   margin: 1.75rem 0 0.5rem;
   padding-bottom: 0.25rem;
   border-bottom: 1px solid var(--border);
+}
+
+.glossary-see {
+  margin: 0.5rem 0;
+  font-style: italic;
 }
 
 /* Tables */

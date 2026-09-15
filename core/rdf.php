@@ -27,28 +27,34 @@ function turtleOutput($data) {
   }
   $nodes = isset($data["@graph"]) ? $data["@graph"] : array($data);
   foreach ($nodes as $node) {
-    $statements = array();
-    foreach ($node as $property => $values) {
-      if ($property == "@context" || $property == "@id") {
-        continue;
-      }
-      //A property has a single value or a list of them
-      if (!is_array($values) || isset($values["@id"]) || isset($values["@value"])) {
-        $values = array($values);
-      }
-      if ($property == "@type") {
-        //Types are prefixed names, such as skos:Concept
-        $statements[] = "a ".implode(", ", $values);
-      } else {
-        $statements[] = $property." ".implode(", ", array_map("turtleValue", $values));
-      }
-    }
-    $out .= "\n".turtleIRI($node["@id"])." ".implode(" ;\n    ", $statements)." .\n";
+    $out .= "\n".turtleIRI($node["@id"])." ".implode(" ;\n    ", turtleStatements($node))." .\n";
   }
   return($out);
 }
 
-//A JSON-LD value (a string, a boolean, or an array with @id, or with @value and either @type or @language) in Turtle
+//What a JSON-LD node says, as Turtle statements of each of its properties with its values, without the node itself
+function turtleStatements($node) {
+  $statements = array();
+  foreach ($node as $property => $values) {
+    if ($property == "@context" || $property == "@id") {
+      continue;
+    }
+    //A property has a single value or a list of them, which starts at 0
+    if (!is_array($values) || !array_key_exists(0, $values)) {
+      $values = array($values);
+    }
+    if ($property == "@type") {
+      //Types are prefixed names, such as skos:Concept
+      $statements[] = "a ".implode(", ", $values);
+    } else {
+      $statements[] = $property." ".implode(", ", array_map("turtleValue", $values));
+    }
+  }
+  return($statements);
+}
+
+//A JSON-LD value in Turtle: a string, a boolean, an array with @id, an array with @value and either @type or @language,
+//or a node without an address, such as a lexical entry's written form, given in brackets as a blank node
 function turtleValue($value) {
   if (is_bool($value)) {
     return(($value) ? "true" : "false");
@@ -56,12 +62,15 @@ function turtleValue($value) {
   if (is_array($value) && isset($value["@id"])) {
     return(turtleIRI($value["@id"]));
   }
-  if (is_array($value) && isset($value["@type"])) {
+  if (is_array($value) && isset($value["@value"]) && isset($value["@type"])) {
     //Datatypes are prefixed names, such as xsd:date
     return(turtleString($value["@value"])."^^".$value["@type"]);
   }
-  if (is_array($value)) {
+  if (is_array($value) && isset($value["@value"])) {
     return(turtleString($value["@value"]).(isset($value["@language"]) ? "@".$value["@language"] : ""));
+  }
+  if (is_array($value)) {
+    return("[ ".implode(" ; ", turtleStatements($value))." ]");
   }
   return(turtleString($value));
 }

@@ -32,6 +32,12 @@ if (!userAllow("edit-terms")) {
            value="<?php print h($sn["name"]); ?>"
            placeholder="">
            <br/><br/>
+    <label for="acronym"><?php print t("Acronym"); ?></label><br/>
+    <small><?php print t("An acronym or initialism the term is also known by, for example PAM for passive acoustic monitoring"); ?></small><br/>
+    <input type="text" id="acronym" name="acronym" maxlength="<?php print TERM_ACRONYM_LENGTH; ?>"
+           value="<?php print h(isset($sn["acronym"]) ? $sn["acronym"] : ""); ?>"
+           placeholder="">
+           <br/><br/>
     <label for="description"><?php print t("Description"); ?></label><br/>
     <textarea id="description" name="description" rows="4" cols="50"><?php print h($sn["description"]);?></textarea><br/>
     <label for="language"><?php print t("Language"); ?></label><br/>
