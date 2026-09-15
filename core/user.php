@@ -67,8 +67,46 @@ function userAllow($task) {
   return(in_array("*", $tasks) || in_array($task, $tasks));
 }
 
+//How long browsers and crawlers may keep a page for a visitor without a session, in seconds
+define("PUBLIC_CACHE_SECONDS", 300);
+
+//Whether a request needs a session: when the visitor already has one (for example because they are logged in),
+//submits a form, visits the login, user or administration pages, or chooses one of the site's languages, which is
+//remembered for the rest of the visit. Other visitors, including crawlers, get no session cookie, and pages they can cache.
+function sessionNeeded($pageInfo) {
+  if (isset($_COOKIE[session_name()])) {
+    return(TRUE);
+  }
+  if (isset($_SERVER["REQUEST_METHOD"]) && $_SERVER["REQUEST_METHOD"] == "POST") {
+    return(TRUE);
+  }
+  if (in_array($pageInfo["page_type"], array("user", "admin"), TRUE)) {
+    return(TRUE);
+  }
+  return(isset($_GET["lang"]) && in_array($_GET["lang"], siteLanguages(), TRUE));
+}
+
+//Start the session, if it hasn't been started. Must run before any output is sent. The cookie is limited to the
+//site's own path, so sites installed in different subdirectories of one domain don't share a login.
+function startSession() {
+  if (session_status() == PHP_SESSION_ACTIVE) {
+    return;
+  }
+  session_start(array(
+    "cookie_httponly" => TRUE,
+    "cookie_samesite" => "Lax",
+    "cookie_secure" => requestIsHttps(),
+    "cookie_path" => basePath()."/",
+    "use_strict_mode" => TRUE
+  ));
+}
+
 //CSRF token for this session, created on first use
 function csrfToken() {
+  //Forms are on pages that start a session, but a customised template might put one elsewhere
+  if (session_status() != PHP_SESSION_ACTIVE && !headers_sent()) {
+    startSession();
+  }
   if (!isset($_SESSION["csrf_token"])) {
     $_SESSION["csrf_token"] = bin2hex(random_bytes(32));
   }
