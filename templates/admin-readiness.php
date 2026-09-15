@@ -5,7 +5,7 @@ if (!userAllow("edit-terms")) {
   print t("You do not have permission to administer this site");
 } else {
   ?>
-  <p><?php print t("Problems that stop the vocabularies meeting TDWG's requirements for controlled vocabulary terms, or giving clean RDF in JSON-LD and Turtle."); ?></p>
+  <p><?php print t("Problems that stop the vocabularies giving complete, clean RDF in JSON-LD and Turtle."); ?></p>
   <?php
   $issues = siteReadinessIssues();
   if (count($issues) == 0) {
