@@ -6,7 +6,7 @@
 
 //Settings administrators can change on the configuration page
 function editableConfigKeys() {
-  return(array("site_name", "author", "publisher", "default_lang", "languages", "base_url", "description", "license", "prefix"));
+  return(array("site_name", "author", "publisher", "default_lang", "languages", "base_url", "description", "glossary_display", "license", "prefix"));
 }
 
 //A configuration setting, or an empty string if it isn't set (for example before the database update that adds it)
@@ -48,6 +48,8 @@ function saveConfig() {
     return(FALSE);
   }
   $vals["languages"] = implode(" ", $languages);
+  //A ticked checkbox is saved as "1", and one that isn't as an empty string
+  $vals["glossary_display"] = ($vals["glossary_display"] == "") ? "" : "1";
 
   $ok = TRUE;
   foreach ($vals as $key => $val) {

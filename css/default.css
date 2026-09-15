@@ -188,6 +188,34 @@ pre {
   font-weight: 600;
 }
 
+/* Glossary display: links to each letter, and a heading for each */
+
+.glossary-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.65rem;
+  margin: 1rem 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--panel);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.glossary-index a {
+  text-decoration: none;
+}
+
+.glossary-index-empty {
+  color: #a3acb6;
+  font-weight: normal;
+}
+
+.glossary-letter {
+  margin: 1.75rem 0 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
 /* Tables */
 
 table {
@@ -328,7 +356,8 @@ button:focus {
 
 @media print {
   #menubar,
-  #sub-menu {
+  #sub-menu,
+  .glossary-index {
     display: none;
   }
 

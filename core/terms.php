@@ -103,6 +103,64 @@ function termsGroupedBy($column, $sql, $ids) {
   return($grouped);
 }
 
+//Whether the site shows its lists of terms as a glossary: in alphabetical order, under a heading for each letter,
+//with links to the letters above and below the list
+function glossaryDisplay() {
+  return(configValue("glossary_display") == "1");
+}
+
+//The name a term is listed under in a glossary: its name, or its shortname if it has none
+function glossaryLabel($term) {
+  $name = trim((string)$term["name"]);
+  return(($name == "") ? (string)$term["shortname"] : $name);
+}
+
+//The letter from A to Z a term is listed under in a glossary, or "#" for a name that doesn't start with one of them
+function glossaryLetter($term) {
+  $letter = strtoupper(substr(glossaryLabel($term), 0, 1));
+  return((preg_match('/^[A-Z]$/D', $letter) === 1) ? $letter : "#");
+}
+
+//The id of a letter's heading in a glossary. Shortnames can't contain a colon, so it can't be the same as a term's id.
+function glossaryAnchor($letter) {
+  return("glossary:".(($letter == "#") ? "other" : $letter));
+}
+
+//Rows of the terms table grouped by glossaryLetter(), as letter => terms, with the letters in order ("#" first) and the
+//terms under each in alphabetical order, ignoring case
+function glossaryGroups($terms) {
+  usort($terms, function($a, $b) {
+    $compare = strnatcasecmp(glossaryLabel($a), glossaryLabel($b));
+    return(($compare != 0) ? $compare : strcmp($a["shortname"], $b["shortname"]));
+  });
+  $byLetter = array();
+  foreach ($terms as $term) {
+    $byLetter[glossaryLetter($term)][] = $term;
+  }
+  $groups = array();
+  foreach (array_merge(array("#"), range("A", "Z")) as $letter) {
+    if (isset($byLetter[$letter])) {
+      $groups[$letter] = $byLetter[$letter];
+    }
+  }
+  return($groups);
+}
+
+//Links to each letter of a glossary, given as glossaryGroups(). Every letter from A to Z is shown, but only those with
+//terms are links; "#" is only shown if some terms are listed under it.
+function glossaryIndex($groups) {
+  $letters = array_merge(isset($groups["#"]) ? array("#") : array(), range("A", "Z"));
+  $items = array();
+  foreach ($letters as $letter) {
+    if (isset($groups[$letter])) {
+      $items[] = '<a href="#'.h(glossaryAnchor($letter)).'">'.h($letter).'</a>';
+    } else {
+      $items[] = '<span class="glossary-index-empty">'.h($letter).'</span>';
+    }
+  }
+  return('<nav class="glossary-index" aria-label="'.h(t("Terms by letter")).'">'.implode(" ", $items).'</nav>');
+}
+
 //The URI of a term given as a row of the terms table, or a link to it
 function term2URI($term, $link=FALSE) {
   $out = Term::fromRow($term)->uri();
