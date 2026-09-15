@@ -46,8 +46,20 @@ function getTerms($cv=null) {
     $ret = $result->fetch_all(MYSQLI_ASSOC);
     $result->close();
   }
+  return(withTermRelations($ret));
+}
 
-  //Fetch related terms for the whole list at once, rather than for each term
+//A term with its related terms (see withTermRelations()), for the term's own page, or NULL if no term has this id
+function getTermForPage($id) {
+  $result = dbQuery("SELECT * FROM ".table("terms")." WHERE `id` = ?;", array($id));
+  $rows = ($result) ? $result->fetch_all(MYSQLI_ASSOC) : array();
+  return((count($rows) > 0) ? withTermRelations($rows)[0] : null);
+}
+
+//Rows of the terms table, each with the terms related to it for showing on a page: "children" (terms it is the parent
+//of), "narrower" (valid terms it is the broader term of) and "broader" (its broader term as a list, if it is valid).
+//The related terms of the whole list are fetched at once, rather than for each term.
+function withTermRelations($ret) {
   $ids = array_column($ret, "id");
   $broaderIds = array();
   foreach ($ret as $row) {

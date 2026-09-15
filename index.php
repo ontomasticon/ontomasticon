@@ -94,6 +94,16 @@ if (in_array($GLOBALS["ontomasticon"]["pageInfo"]["page_type"], array("home", "c
   }
 }
 
+// A term outside a vocabulary has a page at its URI. An address that should be a term's or a vocabulary's, but isn't,
+// is not found, though its page still shows the site's terms or vocabularies, as an old link may be meant for one.
+if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "term") {
+  $pageTerm = Term::findByURI(siteURL().rawurldecode($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]));
+  $GLOBALS["ontomasticon"]["pageTerm"] = ($pageTerm == null) ? null : getTermForPage($pageTerm->id);
+}
+if (pageNotFound()) {
+  http_response_code(404);
+}
+
 // Load correct page template
 switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
   case "api":
@@ -101,6 +111,17 @@ switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
     break;
   case "ping":
     print "pong";
+    break;
+  case "robots.txt":
+    template("robots.php");
+    break;
+  case "sitemap.xml":
+    template("sitemap.php");
+    break;
+  case "favicon.ico":
+    //Browsers ask for this whether or not a page names an icon
+    header("Content-Type: image/png");
+    readfile("images/ontomasticon.png");
     break;
   default:
     //Pages are shown in the language the browser prefers, unless one has been chosen

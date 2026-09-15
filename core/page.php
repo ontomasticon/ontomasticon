@@ -56,6 +56,12 @@ function activePage() {
         $ret["active_subsubpage"] = null;
       }
       break;
+    case "robots.txt":
+    case "sitemap.xml":
+    case "favicon.ico":
+      //Files that crawlers and browsers ask for at the top of a site, which index.php makes
+      $ret["page_type"] = $parts[1];
+      break;
     case "settings":
       if (isset($parts[2]) && $parts[2] == "user.css" && file_exists("settings/user.css")) {
         header('Content-Type: text/css');
@@ -78,7 +84,7 @@ function activePage() {
 
 //The first path segments that activePage() sends somewhere other than a term's page. Keep this in step with its cases.
 function reservedRouteSegments() {
-  return(array("api", "cv", "ping", "update", "user", "admin", "settings"));
+  return(array("api", "cv", "ping", "update", "user", "admin", "settings", "robots.txt", "sitemap.xml", "favicon.ico"));
 }
 
 //The RDF format asked for with ?format=: "jsonld" for format=jsonld, "turtle" for format=ttl, otherwise NULL
@@ -150,6 +156,72 @@ function linkedDataURL($format = "jsonld") {
       return(sitePath("/api/cv/?shortname=".rawurlencode($page["active_page"]).(($turtle) ? "&format=ttl" : "")));
     case "term":
       return(sitePath("/api/term/?term=").rawurlencode(siteURL().rawurldecode($page["active_page"]))."&format=".(($turtle) ? "ttl" : "jsonld"));
+  }
+  return(null);
+}
+
+//The term the current address is a page for, as getTermForPage() gives it, or NULL if there is none
+function currentPageTerm() {
+  return(isset($GLOBALS["ontomasticon"]["pageTerm"]) ? $GLOBALS["ontomasticon"]["pageTerm"] : null);
+}
+
+//The controlled vocabulary the current address is a page for, as a row of the cv table, or NULL if there is none
+function currentPageVocabulary() {
+  $page = $GLOBALS["ontomasticon"]["pageInfo"];
+  if ($page["page_type"] != "cv" || $page["active_page"] == "" || !isset($GLOBALS["ontomasticon"]["CVs"][$page["active_page"]])) {
+    return(null);
+  }
+  return($GLOBALS["ontomasticon"]["CVs"][$page["active_page"]]);
+}
+
+//Whether the current address should be a term's or a vocabulary's, but no term or vocabulary has it
+function pageNotFound() {
+  $page = $GLOBALS["ontomasticon"]["pageInfo"];
+  return(($page["page_type"] == "term" && currentPageTerm() === null)
+    || ($page["page_type"] == "cv" && $page["active_page"] != "" && currentPageVocabulary() === null));
+}
+
+//The page's title: the name of the term or vocabulary it is for, if any, then the site's name
+function pageTitle() {
+  $site = tu("site_name");
+  $term = currentPageTerm();
+  $vocabulary = currentPageVocabulary();
+  if ($term !== null && $term["name"] != "") {
+    return($term["name"]." – ".$site);
+  }
+  if ($vocabulary !== null && $vocabulary["name"] != "") {
+    return($vocabulary["name"]." – ".$site);
+  }
+  return($site);
+}
+
+//The page's description for search engines, as plain text: the definition of the term, or the description of the
+//vocabulary, it is for, or otherwise the site's description
+function pageDescription() {
+  $text = "";
+  if (currentPageTerm() !== null) {
+    $text = plainText(currentPageTerm()["description"]);
+  } elseif (currentPageVocabulary() !== null) {
+    $text = plainText(currentPageVocabulary()["description"]);
+  }
+  if ($text == "") {
+    $text = plainText(tu("description"));
+  }
+  return(shortText($text, 300));
+}
+
+//The address search engines should use for the current page: a term's or vocabulary's URI, or the site's address for the
+//home page. NULL for other pages, including addresses that aren't found.
+function canonicalURL() {
+  $page = $GLOBALS["ontomasticon"]["pageInfo"];
+  if ($page["page_type"] == "home") {
+    return(siteURL());
+  }
+  if (currentPageTerm() !== null) {
+    return(Term::fromRow(currentPageTerm())->uri());
+  }
+  if (currentPageVocabulary() !== null) {
+    return((new Vocabulary(currentPageVocabulary()["shortname"]))->uri());
   }
   return(null);
 }

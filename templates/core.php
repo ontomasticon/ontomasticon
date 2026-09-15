@@ -3,10 +3,10 @@
 <head>
 <meta charset = "UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?php print h(tu("site_name")); ?></title>
+<title><?php print h(pageTitle()); ?></title>
 <meta name="Generator" content="Ontomasticon (https://ontomasticon.github.io/)"/>
 <meta name="author" content="<?php print h($GLOBALS["ontomasticon"]["config"]["author"]); ?>">
-<meta name="description" content="<?php print h(strip_tags(tu("description"))); ?>">
+<meta name="description" content="<?php print h(pageDescription()); ?>">
 <link rel="stylesheet" type="text/css" href="<?php print h(sitePath("/css/default.css")); ?>" />
 <link rel="icon" type="image/png" href="<?php print h(sitePath("/images/ontomasticon.png")); ?>">
 <?php
@@ -15,7 +15,12 @@ if (file_exists("settings/user.css")) {
   <link rel="stylesheet" type="text/css" href="<?php print h(sitePath("/settings/user.css")); ?>" />
   <?php
 }
-if (linkedDataURL() !== null) {
+if (canonicalURL() !== null) {
+  ?>
+  <link rel="canonical" href="<?php print h(canonicalURL()); ?>" />
+  <?php
+}
+if (linkedDataURL() !== null && !pageNotFound()) {
   ?>
   <link rel="alternate" type="application/ld+json" href="<?php print h(linkedDataURL()); ?>" />
   <link rel="alternate" type="text/turtle" href="<?php print h(linkedDataURL("turtle")); ?>" />
@@ -26,7 +31,7 @@ if (linkedDataURL() !== null) {
 
 <body>
 <div id="header">
-  <img src="<?php print h(sitePath("/images/ontomasticon.svg")); ?>" id="logo" />
+  <img src="<?php print h(sitePath("/images/ontomasticon.svg")); ?>" id="logo" alt="" />
   <h1 id="site_title"><?php print l(tu("site_name"), "/"); ?></h1>
 </div>
 
@@ -52,9 +57,10 @@ switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
     template("cv.php");
     break;
   case "home":
-  case "term":
-    //A term's own address shows the list of terms it is in
     template("home.php");
+    break;
+  case "term":
+    template((currentPageTerm() === null) ? "not-found.php" : "term.php");
     break;
   case "user":
     template("user.php");
