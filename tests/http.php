@@ -261,6 +261,9 @@ check("a term with several references lists them, numbered",
 $concept = json_decode(httpRequest("GET", "/api/term/?shortname=acoustic_allometry&format=jsonld")[2], TRUE);
 checkSame("and its JSON-LD gives each of them", array("Krause 2015", array("@id" => "https://doi.org/10.1000/example")),
   is_array($concept) ? array($concept["dcterms:bibliographicCitation"], $concept["dcterms:source"]) : null);
+$db->query("UPDATE ".table("terms")." SET `reference` = 'Krause 2015' WHERE `shortname` = 'acoustic_allometry';");
+list(, , $body) = httpRequest("GET", "/acoustic_allometry");
+check("and a single reference is numbered too", strpos($body, "<p class='term-reference'>Reference: [1] Krause 2015</p>") !== FALSE);
 $db->query("UPDATE ".table("terms")." SET `description` = NULL, `reference` = NULL WHERE `shortname` = 'acoustic_allometry';");
 list(, , $body) = httpRequest("GET", "/2");
 check("an opaque term's page is at its id", strpos($body, 'id="2"') !== FALSE && strpos($body, "<title>Opaque term – Site name.</title>") !== FALSE);
