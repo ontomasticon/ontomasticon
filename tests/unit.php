@@ -693,3 +693,26 @@ foreach (readinessIssues(array($stridulation, $method, $withoutValues, $missingV
 checkSame("the readiness report lists properties without values, values from a missing vocabulary, and values on a term that isn't a property",
   array("values" => array("PulseCount"), "values-vocabulary" => array("SoundPropagationMedium"), "values-not-property" => array("Echeme")), $valueIssues);
 unset($GLOBALS["ontomasticon"]["CVs"]);
+
+section("Glossary display");
+check("is off unless the site turns it on", !glossaryDisplay());
+$GLOBALS["ontomasticon"]["config"]["glossary_display"] = "1";
+check("and on when it does", glossaryDisplay());
+unset($GLOBALS["ontomasticon"]["config"]["glossary_display"]);
+$groups = glossaryGroups(array(
+  array("shortname" => "zebra_finch", "name" => "zebra finch"),
+  array("shortname" => "Echo", "name" => "Echo"),
+  array("shortname" => "alarm_call", "name" => "Alarm call"),
+  array("shortname" => "tone_2khz", "name" => "2 kHz tone"),
+  array("shortname" => "unnamed", "name" => ""),
+  array("shortname" => "echeme", "name" => "echeme")
+));
+checkSame("groups terms by the first letter of their names, ignoring case, with other characters first",
+  array("#", "A", "E", "U", "Z"), array_keys($groups));
+checkSame("sorts the terms under a letter alphabetically, ignoring case", array("echeme", "Echo"), array_column($groups["E"], "shortname"));
+checkSame("files a term without a name under its short name", array("unnamed"), array_column($groups["U"], "shortname"));
+$index = glossaryIndex($groups);
+check("links to the letters that have terms", strpos($index, '<a href="#glossary:A">A</a>') !== FALSE && strpos($index, '<a href="#glossary:other">#</a>') !== FALSE);
+check("and shows the others without a link", strpos($index, '<span class="glossary-index-empty">B</span>') !== FALSE && strpos($index, 'href="#glossary:B"') === FALSE);
+checkSame("lists every letter from A to Z", 27, preg_match_all('/>[A-Z#]</', $index));
+check("leaves out # when no term is filed under it", strpos(glossaryIndex(array("A" => array())), "#</") === FALSE);

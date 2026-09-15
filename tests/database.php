@@ -401,6 +401,12 @@ list($out, $ok) = capture(function() { return(saveConfig()); });
 check("refuses other languages that aren't language codes", !$ok && strpos($out, "Other languages must be language codes") !== FALSE && getConfig()["languages"] == "fr pt-BR");
 $_POST["languages"] = "";
 capture(function() { return(saveConfig()); });
+$_POST["glossary_display"] = "on";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("saves glossary display when its box is ticked", $ok && getConfig()["glossary_display"] === "1");
+unset($_POST["glossary_display"]);
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("and turns it off when it isn't", $ok && getConfig()["glossary_display"] === "");
 
 section("Readiness report");
 $issues = array();

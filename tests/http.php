@@ -108,6 +108,19 @@ check("a visitor with a session isn't given pages to keep", !hasHeader($headers,
 unset($GLOBALS["http_cookie"]);
 list($status) = httpRequest("GET", "/css/default.css");
 checkSame("serves static files directly", 200, $status);
+list(, , $body) = httpRequest("GET", "/");
+check("terms aren't grouped by letter unless the site asks for it", strpos($body, "glossary-index") === FALSE);
+$db->query("INSERT INTO ".table("config")." (`key`, `value`) VALUES ('glossary_display', '1');");
+list(, , $body) = httpRequest("GET", "/");
+check("with glossary display, the home page has links to each letter at the top and bottom",
+  substr_count($body, '<nav class="glossary-index"') == 2 && strpos($body, '<a href="#glossary:A">A</a>') !== FALSE
+  && strpos($body, '<span class="glossary-index-empty">B</span>') !== FALSE);
+check("and its terms under a heading for their letter, in alphabetical order",
+  strpos($body, '<h2 class="glossary-letter" id="glossary:A">A</h2>') !== FALSE
+  && strpos($body, '<h2 class="glossary-letter" id="glossary:A">A</h2>') < strpos($body, 'id="acoustic_allometry"')
+  && strpos($body, 'id="acoustic_allometry"') < strpos($body, '<h2 class="glossary-letter" id="glossary:O">O</h2>')
+  && strpos($body, '<h2 class="glossary-letter" id="glossary:O">O</h2>') < strpos($body, "<h3>Opaque term"));
+$db->query("DELETE FROM ".table("config")." WHERE `key` = 'glossary_display';");
 list(, , $body) = httpRequest("GET", "/ping");
 checkSame("ping", "pong", $body);
 list(, , $body) = httpRequest("GET", "/cv");
@@ -382,6 +395,7 @@ check("while logged in, public pages aren't kept, so edits show at once",
   hasHeader($homeHeaders, '/^Cache-Control: .*no-store/i') && !hasHeader($homeHeaders, '/^Cache-Control: public/i') && strpos($homeBody, "Administration</a>") !== FALSE);
 check("the configuration form has the publishing settings",
   strpos($body, 'name="publisher"') !== FALSE && strpos($body, 'name="license"') !== FALSE && strpos($body, 'name="prefix"') !== FALSE);
+check("and the glossary display checkbox", strpos($body, '<input type="checkbox" id="glossary_display" name="glossary_display" value="1" >') !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/config", array(
   "csrf_token" => $token, "site_name" => "Test glossary", "author" => "Tester", "publisher" => "Test publisher",
   "default_lang" => "en", "base_url" => "glossary.example.org/", "description" => "Testing",
