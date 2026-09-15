@@ -26,6 +26,10 @@ if (linkedDataURL() !== null && !pageNotFound()) {
   <link rel="alternate" type="text/turtle" href="<?php print h(linkedDataURL("turtle")); ?>" />
   <?php
 }
+$structuredData = pageStructuredData();
+if ($structuredData !== null) {
+  print schemaOrgScript($structuredData);
+}
 ?>
 </head>
 

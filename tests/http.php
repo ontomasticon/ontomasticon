@@ -259,6 +259,40 @@ check("but not terms in a vocabulary, which are on its page", strpos($body, "cal
 list($status, $headers) = httpRequest("GET", "/favicon.ico");
 check("favicon.ico is the site's icon", $status == 200 && hasHeader($headers, '#^Content-Type: image/png#i'));
 
+section("HTTP: schema.org");
+//The schema.org data embedded in a page, decoded, or NULL if there is none
+function structuredData($body) {
+  if (preg_match('#<script type="application/ld\+json">(.*?)</script>#s', $body, $matches) !== 1) {
+    return(null);
+  }
+  $data = json_decode($matches[1], TRUE);
+  return(is_array($data) ? $data : null);
+}
+$db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `parent`, `invalid_reason`) SELECT 'allometry', 'Allometry', 'en', 0, `id`, 'Synonym' FROM ".table("terms")." WHERE `shortname` = 'acoustic_allometry';");
+list(, , $body) = httpRequest("GET", "/acoustic_allometry");
+$data = structuredData($body);
+checkSame("a term's page describes the term as a schema.org defined term", array("https://schema.org", "DefinedTerm", "https://glossary.example.org/acoustic_allometry", "acoustic_allometry"),
+  is_array($data) ? array($data["@context"], $data["@type"], $data["@id"], $data["termCode"]) : null);
+checkSame("with its synonyms' names as other names", array(array("@value" => "Allometry", "@language" => "en")),
+  isset($data["alternateName"]) ? $data["alternateName"] : null);
+checkSame("in the site's set of terms", array("@type" => "DefinedTermSet", "@id" => "https://glossary.example.org/", "name" => array("@value" => "Site name.", "@language" => "en"), "url" => "https://glossary.example.org/"),
+  isset($data["inDefinedTermSet"]) ? $data["inDefinedTermSet"] : null);
+$db->query("DELETE FROM ".table("terms")." WHERE `shortname` = 'allometry';");
+$data = structuredData(httpRequest("GET", "/")[2]);
+$ids = isset($data["hasDefinedTerm"]) ? array_column($data["hasDefinedTerm"], "@id") : array();
+checkSame("the home page describes the site's terms as a defined term set", array("DefinedTermSet", "https://glossary.example.org/"),
+  is_array($data) ? array($data["@type"], $data["@id"]) : null);
+check("listing the terms that aren't in a vocabulary", in_array("https://glossary.example.org/acoustic_allometry", $ids)
+  && !in_array("https://glossary.example.org/cv/calls#calling_song", $ids));
+$data = structuredData(httpRequest("GET", "/cv/calls")[2]);
+$ids = isset($data["hasDefinedTerm"]) ? array_column($data["hasDefinedTerm"], "@id") : array();
+checkSame("a vocabulary's page describes it as a set", array("DefinedTermSet", "https://glossary.example.org/cv/calls"),
+  is_array($data) ? array($data["@type"], $data["@id"]) : null);
+check("listing its terms at their URIs, in that set", in_array("https://glossary.example.org/cv/calls#calling_song", $ids)
+  && $data["hasDefinedTerm"][0]["inDefinedTermSet"] == array("@id" => "https://glossary.example.org/cv/calls"));
+check("addresses that aren't found, and the list of vocabularies, have none", structuredData(httpRequest("GET", "/no_such_term")[2]) === null
+  && structuredData(httpRequest("GET", "/cv/nonexistent")[2]) === null && structuredData(httpRequest("GET", "/cv")[2]) === null);
+
 section("HTTP: term types");
 $db->query("UPDATE ".table("terms")." SET `type` = 'property' WHERE `shortname` = 'agreement_song';");
 list(, , $body) = httpRequest("GET", "/");

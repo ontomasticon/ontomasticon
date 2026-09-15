@@ -423,6 +423,50 @@ check("a scheme without terms has no top concepts", !isset($scheme["skos:hasTopC
 checkSame("a language that isn't a valid language tag is left out", "Calling Song", jsonLDText("Calling Song", "en_GB"));
 checkSame("a language tag with a region is kept", array("@value" => "Canto", "@language" => "pt-BR"), jsonLDText("Canto", "pt-BR"));
 
+section("schema.org");
+$ld = schemaOrgTerm($song);
+checkSame("a term is a defined term at its URI", array("DefinedTerm", "https://glossary.example.org/cv/callType#AgreementSong"), array($ld["@type"], $ld["@id"]));
+checkSame("named in its language", array("@value" => "Agreement Song", "@language" => "en"), $ld["name"]);
+checkSame("with its shortname as its code", "AgreementSong", $ld["termCode"]);
+checkSame("and its definition as plain text", array("@value" => "The female’s response.", "@language" => "en"), $ld["description"]);
+checkSame("its synonyms' names are other names for it", array(array("@value" => "Attraction Song", "@language" => "en")), $ld["alternateName"]);
+checkSame("and it is in its vocabulary's set", array("@id" => "https://glossary.example.org/cv/callType"), $ld["inDefinedTermSet"]);
+check("a term without synonyms has no other names", !isset(schemaOrgTerm($premating)["alternateName"]));
+
+$ld = schemaOrgTermJSONLD($song, $callType);
+checkSame("a term's page starts with the schema.org context", array("@context", "https://schema.org"), array(array_keys($ld)[0], $ld["@context"]));
+checkSame("and names the set the term is in", array("@type" => "DefinedTermSet", "@id" => "https://glossary.example.org/cv/callType",
+  "name" => array("@value" => "Type of Call", "@language" => "en"), "url" => "https://glossary.example.org/cv/callType"), $ld["inDefinedTermSet"]);
+
+$published = clone $callType;
+$published->creator = "Test Author";
+$published->publisher = "Natural History Museum";
+$published->license = "https://creativecommons.org/licenses/by/4.0/";
+$ld = schemaOrgTermSetJSONLD($published, array($premating, $song));
+checkSame("a vocabulary is a defined term set at its address", array("https://schema.org", "DefinedTermSet", "https://glossary.example.org/cv/callType", "https://glossary.example.org/cv/callType"),
+  array($ld["@context"], $ld["@type"], $ld["@id"], $ld["url"]));
+checkSame("described in plain text, in the site's language", array(array("@value" => "Calls with the same function.", "@language" => "en"), "en"),
+  array($ld["description"], $ld["inLanguage"]));
+checkSame("with its creator, publisher, license and reference", array("Test Author", "Natural History Museum", "https://creativecommons.org/licenses/by/4.0/", "Ragge and Reynolds 1998"),
+  array($ld["creator"], $ld["publisher"], $ld["license"], $ld["citation"]));
+checkSame("and its terms", array("https://glossary.example.org/cv/callType#PrematingSong", "https://glossary.example.org/cv/callType#AgreementSong"),
+  array_column($ld["hasDefinedTerm"], "@id"));
+check("which don't repeat the context", !isset($ld["hasDefinedTerm"][0]["@context"]));
+$ld = schemaOrgTermSetJSONLD(Vocabulary::site(), array());
+checkSame("the site's own set is at the site address", "https://glossary.example.org/", $ld["@id"]);
+check("and a set without terms doesn't list any", !isset($ld["hasDefinedTerm"]));
+$published->license = "CC BY 4.0";
+check("a license that isn't a web address is left out", !isset(schemaOrgTermSetJSONLD($published, array())["license"]));
+
+if (function_exists("json_encode")) {
+  $data = array("description" => "Ends </script><script>alert(1)</script> & more");
+  $script = schemaOrgScript($data);
+  check("is embedded in a JSON-LD script element", strpos($script, '<script type="application/ld+json">') === 0);
+  checkSame("that text in the data can't end", 1, substr_count(strtolower($script), "</script"));
+  preg_match('#^<script[^>]*>(.*)</script>\s*$#s', $script, $matches);
+  checkSame("and that still holds the same data", $data, json_decode(isset($matches[1]) ? $matches[1] : "", TRUE));
+}
+
 section("Turtle");
 checkSame("Turtle when it is asked for", "turtle", formatFor("text/turtle"));
 checkSame("Turtle when it is preferred to JSON-LD", "turtle", formatFor("application/ld+json;q=0.5, text/turtle"));
