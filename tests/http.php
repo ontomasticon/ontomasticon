@@ -279,11 +279,19 @@ list(, , $body) = httpRequest("GET", "/api/cv/");
 $ld = json_decode($body, TRUE);
 checkSame("the site's scheme then gives the license", array("@id" => "https://creativecommons.org/licenses/by/4.0/"),
   (is_array($ld) && isset($ld["@graph"][0]["dcterms:license"])) ? $ld["@graph"][0]["dcterms:license"] : null);
+list($status, , $body) = httpRequest("GET", "/admin/readiness");
+check("the readiness report opens", $status == 200 && strpos($body, "Linked data readiness</h2>") !== FALSE);
+check("and lists terms without a definition, linking to where they can be edited",
+  strpos($body, "<h3 id='definition'>") !== FALSE && strpos($body, "<a href='/admin/term/edit/acoustic_allometry'>acoustic_allometry</a>") !== FALSE);
+check("but not the license, which is now set", strpos($body, "<h3 id='license'>") === FALSE);
+check("the administration menu links to it", strpos($body, "<a href='/admin/readiness'>") !== FALSE);
 
 list(, , $body) = httpRequest("POST", "/user/login", array("csrf_token" => $token, "logout" => ""));
 check("logs out", strpos($body, "Logged out.") !== FALSE);
 list(, , $body) = httpRequest("GET", "/admin/config");
 check("admin pages are refused after logging out", strpos($body, "You do not have permission") !== FALSE);
+list(, , $body) = httpRequest("GET", "/admin/readiness");
+check("and so is the readiness report", strpos($body, "You do not have permission") !== FALSE && strpos($body, "<h3 id=") === FALSE);
 
 proc_terminate($server);
 proc_close($server);

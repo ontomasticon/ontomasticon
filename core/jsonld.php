@@ -157,10 +157,15 @@ function jsonLDReference($node, $reference) {
 //A text value, tagged with its language if it has one. A language that isn't a valid
 //language tag (such as en_GB) is left out, as it would make the RDF invalid.
 function jsonLDText($text, $language) {
-  if (!preg_match('/^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$/', (string)$language)) {
+  if (!validLanguageTag($language)) {
     return((string)$text);
   }
   return(array("@value" => (string)$text, "@language" => $language));
+}
+
+//Whether a term's language can be used as a language tag in RDF, such as en or pt-BR
+function validLanguageTag($language) {
+  return(preg_match('/^[a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*$/D', (string)$language) === 1);
 }
 
 //The date of a database DATETIME as an xsd:date value, or NULL if there is no date

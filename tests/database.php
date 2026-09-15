@@ -286,6 +286,15 @@ $_POST["publisher"] = "Restored publisher";
 list($out, $ok) = capture(function() { return(saveConfig()); });
 check("saves a setting whose row is missing, as before the update that adds it", $ok && getConfig()["publisher"] == "Restored publisher");
 
+section("Readiness report");
+$issues = array();
+foreach (siteReadinessIssues() as $issue) {
+  $issues[$issue["id"]] = array_column($issue["items"], "label");
+}
+checkSame("reports that the site has no license", array("Site configuration"), isset($issues["license"]) ? $issues["license"] : null);
+checkSame("and the terms without a definition", array("animal_sound", "bird_song", "wren_song"), isset($issues["definition"]) ? $issues["definition"] : null);
+check("but not the site's namespace prefix, which is set", !isset($issues["prefix"]));
+
 section("Users and logging in");
 $_POST = array("first_name" => "Ada", "surname" => "Editor", "email" => " ada@example.org ", "password" => " correct horse ", "role" => "editor");
 capture(function() { return(createUser()); });
