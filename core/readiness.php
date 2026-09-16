@@ -69,9 +69,11 @@ function readinessIssues($terms, $vocabularies, $config) {
     if (plainText($term->description) == "") {
       $items["definition"][] = $item;
     }
-    //[1], [2] and so on in a definition cite the term's references in order (see referenceList())
-    if (preg_match_all('/\[([0-9]+)\]/', plainText($term->description), $cited) > 0
-      && max(array_map("intval", $cited[1])) > count(referenceList($term->reference))) {
+    //[1], [2] and so on in a definition cite the term's references in order (see referenceList()). A list such as [1,2],
+    //or a range such as [2-4] (with a hyphen or an en dash, \xE2\x80\x93 in UTF-8), cites several at once.
+    if (preg_match_all('/\[[0-9]+(?:\s*(?:,|-|\xE2\x80\x93)\s*[0-9]+)*\]/', plainText($term->description), $citations) > 0
+      && preg_match_all('/[0-9]+/', implode(" ", $citations[0]), $cited) > 0
+      && max(array_map("intval", $cited[0])) > count(referenceList($term->reference))) {
       $items["citations"][] = $item;
     }
     if (!validLanguageTag($term->language)) {

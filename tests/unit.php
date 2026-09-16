@@ -646,14 +646,20 @@ checkSame("and each vocabulary to its edit page", array("label" => "callType", "
 checkSame("a site with nothing to fix has no problems", array(), readinessIssues(array($readinessTerms[0]),
   array("callType" => array("shortname" => "callType", "name" => "Type of Call", "prefix" => "calltype")),
   array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "")));
-$citationIssues = array();
-foreach (readinessIssues(array(
-  testTerm(array("id" => 28, "shortname" => "Cited", "name" => "Cited", "description" => "Cites [1] and [2].", "reference" => "One\nTwo")),
-  testTerm(array("id" => 29, "shortname" => "Uncited", "name" => "Uncited", "description" => "Cites [2].", "reference" => "One"))
-), array(), array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "gl")) as $issue) {
-  $citationIssues[$issue["id"]] = array_column($issue["items"], "label");
+//The problems the readiness report finds in a term with this definition and these references
+function readinessFor($description, $reference) {
+  $term = testTerm(array("id" => 28, "shortname" => "Cited", "name" => "Cited", "description" => $description, "reference" => $reference));
+  return(array_column(readinessIssues(array($term), array(), array("license" => "https://creativecommons.org/licenses/by/4.0/", "prefix" => "gl")), "id"));
 }
-checkSame("and terms whose definition cites a reference they don't have", array("citations" => array("Uncited")), $citationIssues);
+checkSame("and a term whose definition cites a reference it doesn't have", array("citations"), readinessFor("Cites [2].", "One"));
+checkSame("but not one citing references it has", array(), readinessFor("Cites [1] and [2].", "One\nTwo"));
+checkSame("a list of citations, such as [1,2], cites each reference in it", array(), readinessFor("Cites [1,2].", "One\nTwo"));
+checkSame("so a list citing a reference the term doesn't have is listed, with or without spaces", array(array("citations"), array("citations")),
+  array(readinessFor("Cites [1,4].", "One\nTwo"), readinessFor("Cites [1, 2, 3].", "One\nTwo")));
+checkSame("and so is a range such as [2-4], with a hyphen or an en dash, unless the term has every reference in it",
+  array(array("citations"), array("citations"), array()),
+  array(readinessFor("Cites [2-4].", "One\nTwo\nThree"), readinessFor("Cites [2&ndash;4].", "One\nTwo\nThree"), readinessFor("Cites [1-3].", "One\nTwo\nThree")));
+checkSame("brackets holding anything else aren't citations", array(), readinessFor("Brackets such as [sic] and [in 1977] aren't citations.", "One"));
 
 section("Static files");
 check("the stylesheet's address has the time it last changed", preg_match('#^/css/default\.css\?v=[0-9]+$#D', assetPath("/css/default.css")) === 1);
