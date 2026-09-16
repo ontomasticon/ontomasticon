@@ -153,6 +153,24 @@ if (!userAllow("administer")) {
     }
   }
 
+  if (!$failed && version_compare($version_db, "0.4.5", "<")) {
+    //Terms related to each other (see saveRelatedTerms()), with a row for each way round
+    $sql = "CREATE TABLE IF NOT EXISTS ".table("related_terms")." (
+      `term` int(11) NOT NULL,
+      `related` int(11) NOT NULL,
+      PRIMARY KEY (`term`, `related`),
+      KEY `related` (`related`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+    if (mysqli_query($db, $sql)) {
+      $version_db = setDBVersion("0.4.5");
+      $updated = TRUE;
+      print "<p>".t("Ontomasticon has been updated to version 0.4.5")."</p>";
+    } else {
+      $failed = TRUE;
+      print "<div class='error'><p>".t("Update to version 0.4.5 failed").": ".h($db->error)."</p></div>";
+    }
+  }
+
   //Term languages were widened for language tags such as zh-Hant without a new version, so this runs whenever
   //the column is still narrow, including on databases that were already updated to 0.4
   if (!$failed && termLanguageColumnTooNarrow()) {

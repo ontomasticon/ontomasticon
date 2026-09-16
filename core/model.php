@@ -90,7 +90,7 @@ class Term {
     return(Term::loadAll("`cv` = ?", array($shortname)));
   }
 
-  //Load the related terms of a list of terms with three queries in all, rather than several for each term
+  //Load the related terms of a list of terms with four queries in all, rather than several for each term
   public static function loadRelations($terms) {
     $ids = array();
     $linkedIDs = array();
@@ -102,6 +102,10 @@ class Term {
         }
       }
     }
+    $relatedIDs = Term::relatedIDs($ids);
+    foreach ($relatedIDs as $termRelatedIDs) {
+      $linkedIDs = array_merge($linkedIDs, $termRelatedIDs);
+    }
     $byID = Term::groupBy("id", Term::loadIn("`id`", $linkedIDs));
     $narrower = Term::groupBy("broaderID", Term::loadIn("`broader`", $ids, " AND `invalid_reason` IS NULL"));
     $children = Term::groupBy("parentID", Term::loadIn("`parent`", $ids));
@@ -110,7 +114,34 @@ class Term {
       $term->setRelated("parent", ($term->parentID != null && isset($byID[$term->parentID])) ? $byID[$term->parentID][0] : null);
       $term->setRelated("narrower", isset($narrower[$term->id]) ? $narrower[$term->id] : array());
       $term->setRelated("children", isset($children[$term->id]) ? $children[$term->id] : array());
+      $related = array();
+      foreach (isset($relatedIDs[$term->id]) ? $relatedIDs[$term->id] : array() as $id) {
+        if (isset($byID[$id])) {
+          $related[] = $byID[$id][0];
+        }
+      }
+      $term->setRelated("related", $related);
     }
+  }
+
+  //The ids of the related terms (see saveRelatedTerms()) of each of the terms with the ids in $ids, as a term's id => the
+  //ids of its related terms, in order of their short names
+  private static function relatedIDs($ids) {
+    $ids = array_values(array_unique($ids));
+    $related = array();
+    if (count($ids) == 0) {
+      return($related);
+    }
+    $sql  = "SELECT `r`.`term`, `r`.`related` FROM ".table("related_terms")." AS `r` JOIN ".table("terms")." AS `t` ON `t`.`id` = `r`.`related` ";
+    $sql .= "WHERE `r`.`term` IN (".implode(", ", array_fill(0, count($ids), "?")).") ORDER BY `t`.`shortname`;";
+    $result = dbQuery($sql, $ids);
+    if ($result) {
+      foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
+        $related[$row["term"]][] = $row["related"];
+      }
+      $result->close();
+    }
+    return($related);
   }
 
   //Terms matching a condition on the terms table, with ? placeholders filled from $params
@@ -206,7 +237,12 @@ class Term {
     return($this->relation("children"));
   }
 
-  //Set a relation (broader, narrower, parent or children) instead of loading it from the database
+  //The term's related terms (see saveRelatedTerms()), in order of short name
+  public function related() {
+    return($this->relation("related"));
+  }
+
+  //Set a relation (broader, narrower, parent, children or related) instead of loading it from the database
   public function setRelated($relation, $value) {
     $this->related[$relation] = $value;
   }
@@ -228,6 +264,8 @@ class Term {
         return(($this->id == null) ? array() : Term::loadAll("`broader` = ? AND `invalid_reason` IS NULL", array($this->id)));
       case "children":
         return(($this->id == null) ? array() : Term::loadAll("`parent` = ?", array($this->id)));
+      case "related":
+        return(($this->id == null) ? array() : Term::loadAll("`id` IN (SELECT `related` FROM ".table("related_terms")." WHERE `term` = ?)", array($this->id)));
     }
     return(null);
   }

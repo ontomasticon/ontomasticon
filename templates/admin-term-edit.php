@@ -95,6 +95,12 @@ if (!userAllow("edit-terms")) {
            value="<?php print ($sn["broader"]=="") ? "" : htmlspecialchars($sn["broader"]); ?>"
            placeholder="">
            <br/><br/>
+    <label for="related"><?php print t("Related terms"); ?></label><br/>
+    <small><?php print t("The short names of other terms related to this one, such as terms to see also, separated by commas. Each term is listed as related to the other."); ?></small><br/>
+    <input type="text" id="related" name="related"
+           value="<?php print h(implode(", ", relatedTermShortnames($sn["id"]))); ?>"
+           placeholder="">
+           <br/><br/>
     <label for="reference"><?php print t("References"); ?></label><br/>
     <small><?php print t("One reference per line. In the definition, [1] is the first reference, [2] the second, and so on."); ?></small><br/>
     <textarea id="reference" name="reference" rows="3" cols="50"><?php print h($sn["reference"]); ?></textarea>

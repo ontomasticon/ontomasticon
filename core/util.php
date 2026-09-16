@@ -87,7 +87,7 @@ function table($name) {
 
 //SQL from a file, such as the installer's, with the table prefix added to the tables it creates and fills
 function prefixTables($sql) {
-  return(preg_replace('/\b(TABLE(?: IF (?:NOT )?EXISTS)?|INTO)\s+`?(config|cv|terms|users|login_attempts)\b`?/', '$1 '.table('$2'), $sql));
+  return(preg_replace('/\b(TABLE(?: IF (?:NOT )?EXISTS)?|INTO)\s+`?(config|cv|terms|related_terms|users|login_attempts)\b`?/', '$1 '.table('$2'), $sql));
 }
 
 //The error from the last dbQuery() that failed

@@ -46,7 +46,7 @@ function runSQLFile($sqlFile) {
 function termForm($fields) {
   $_POST = array_merge(array(
     "shortname" => "", "name" => "", "description" => "", "language" => "en",
-    "cv" => "none", "invalid" => "none", "parent" => "", "broader" => "", "reference" => ""
+    "cv" => "none", "invalid" => "none", "parent" => "", "broader" => "", "related" => "", "reference" => ""
   ), $fields);
 }
 
@@ -85,6 +85,7 @@ check("term languages can be 35 characters long", !termLanguageColumnTooNarrow()
 check("terms have a type column", $db->query("SELECT `type` FROM ".table("terms")." LIMIT 1;") !== FALSE);
 check("and columns for where a property's values come from", $db->query("SELECT `range_cv`, `datatype` FROM ".table("terms")." LIMIT 1;") !== FALSE);
 check("terms have an acronym column", $db->query("SELECT `acronym` FROM ".table("terms")." LIMIT 1;") !== FALSE);
+check("the related_terms table exists", $db->query("SELECT 1 FROM ".table("related_terms")." LIMIT 1;") !== FALSE);
 
 section("Adding terms");
 termForm(array("shortname" => "sound", "name" => "Sound"));
@@ -123,6 +124,12 @@ check("including one with characters that mean something in URIs", !$ok && termR
 termForm(array("shortname" => "song", "parent" => "missing"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("refuses a parent term that doesn't exist", !$ok && strpos($out, "no term with the short name") !== FALSE && termRow("song") == null);
+termForm(array("shortname" => "song", "related" => "sound, missing"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("or a related term that doesn't exist", !$ok && strpos($out, "no term with the short name missing") !== FALSE && termRow("song") == null);
+termForm(array("shortname" => "song", "related" => "Song"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+check("or the term itself as a related term", !$ok && strpos($out, "be related to itself") !== FALSE && termRow("song") == null);
 termForm(array("shortname" => "api", "name" => "API"));
 list($out, $ok) = capture(function() { return(addTerm()); });
 check("refuses a short name outside a vocabulary that the site uses for its own pages", !$ok && strpos($out, "own pages or files") !== FALSE && termRow("api") == null);
@@ -310,6 +317,50 @@ check("stops following links at a loop saved before loops were refused", $ok && 
 dbQuery("UPDATE ".table("terms")." SET `broader` = NULL WHERE `shortname` IN ('sound', 'bird_song');");
 dbQuery("UPDATE ".table("terms")." SET `broader` = ? WHERE `shortname` = 'animal_sound';", array(termRow("sound")["id"]));
 
+section("Related terms");
+$GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "bird_song";
+$birdSongForm = array("name" => "Birdsong", "parent" => "sound", "reference" => "Jones 2021", "type" => "class");
+termForm($birdSongForm + array("related" => "animal_sound, sound animal_sound"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+checkSame("saves a term's related terms, each once", array("animal_sound", "sound"), $ok ? relatedTermShortnames(termRow("bird_song")["id"]) : null);
+checkSame("and relates each of them to the term", array(array("bird_song"), array("bird_song")),
+  array(relatedTermShortnames(termRow("animal_sound")["id"]), relatedTermShortnames(termRow("sound")["id"])));
+$terms = array();
+foreach (getTerms() as $term) {
+  $terms[$term["shortname"]] = $term;
+}
+checkSame("lists each term's related terms", array(array("animal_sound", "sound"), array("bird_song")),
+  array(array_column($terms["bird_song"]["related"], "shortname"), array_column($terms["animal_sound"]["related"], "shortname")));
+checkSame("Term objects load them", array("animal_sound", "sound"), $shortnames(Term::find("bird_song")->related()));
+$siteTerms = array();
+foreach (Vocabulary::site()->terms() as $term) {
+  $siteTerms[$term->shortname] = $term;
+}
+checkSame("as they do when loading a vocabulary's terms together", array("animal_sound", "sound"), $shortnames($siteTerms["bird_song"]->related()));
+checkSame("JSON-LD links them as related, linking the parent, which is also a related term, only once", array(
+  array("@id" => "https://glossary.example.org/sound"), array("@id" => "https://glossary.example.org/animal_sound")
+), termJSONLD(Term::find("bird_song"))["skos:related"]);
+termForm($birdSongForm + array("related" => "sound"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+checkSame("leaving a term out of the related terms unrelates both terms", array(array("sound"), array()),
+  array($ok ? relatedTermShortnames(termRow("bird_song")["id"]) : null, relatedTermShortnames(termRow("animal_sound")["id"])));
+termForm($birdSongForm + array("related" => "missing"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("refuses a related term that doesn't exist, keeping the related terms",
+  !$ok && strpos($out, "no term with the short name missing") !== FALSE && relatedTermShortnames(termRow("bird_song")["id"]) === array("sound"));
+termForm($birdSongForm + array("related" => "sound bird_song"));
+list($out, $ok) = capture(function() { return(editTerm()); });
+check("or the term itself", !$ok && strpos($out, "be related to itself") !== FALSE && relatedTermShortnames(termRow("bird_song")["id"]) === array("sound"));
+termForm(array("shortname" => "dawn_chorus", "name" => "Dawn chorus", "related" => "bird_song"));
+list($out, $ok) = capture(function() { return(addTerm()); });
+checkSame("adds a term with its related terms", array(array("bird_song"), array("dawn_chorus", "sound")),
+  array($ok ? relatedTermShortnames(termRow("dawn_chorus")["id"]) : null, relatedTermShortnames(termRow("bird_song")["id"])));
+$dawnChorus = termRow("dawn_chorus")["id"];
+$GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "dawn_chorus";
+list($out, $ok) = capture(function() { return(deleteTerm()); });
+check("deleting a term removes it from other terms' related terms", $ok && relatedTermShortnames(termRow("bird_song")["id"]) === array("sound"));
+checkSame("leaving no related terms for it", 0, dbQuery("SELECT * FROM ".table("related_terms")." WHERE `term` = ? OR `related` = ?;", array($dawnChorus, $dawnChorus))->num_rows);
+
 section("Deleting terms");
 $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"] = "sound";
 termForm(array("shortname" => "noise", "name" => "Noise", "invalid" => "Synonym", "parent" => "sound"));
@@ -324,6 +375,7 @@ list($out, $ok) = capture(function() { return(deleteTerm()); });
 check("deletes the term", $ok && termRow("sound") == null);
 checkSame("clears parent links to it from terms that aren't synonyms", null, termRow("bird_song")["parent"]);
 checkSame("clears broader links to it", null, termRow("animal_sound")["broader"]);
+checkSame("and removes it from other terms' related terms", array(), relatedTermShortnames(termRow("bird_song")["id"]));
 
 section("Controlled vocabularies");
 $_POST = array("shortname" => "birds", "name" => "Birds", "description" => "", "reference" => "", "prefix" => "birds");
@@ -411,9 +463,15 @@ list($out, $ok) = capture(function() { return(deleteCV()); });
 check("refuses to delete a vocabulary whose terms have synonyms outside it, naming only those",
   !$ok && strpos($out, "redbreast") !== FALSE && strpos($out, "erithacus") === FALSE && array_key_exists("birds", getCVs()));
 dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'redbreast';");
+$robin = termRow("robin")["id"];
+saveRelatedTerms(termRow("wren_song")["id"], array($robin));
 list($out, $ok) = capture(function() { return(deleteCV()); });
 check("deletes the vocabulary and its terms, including its synonyms", $ok && !array_key_exists("birds", getCVs()) && termRow("robin") == null && termRow("erithacus") == null);
 checkSame("clears links from other terms to the deleted terms", null, termRow("wren_song")["parent"]);
+checkSame("including related terms", array(0, array()), array(
+  dbQuery("SELECT * FROM ".table("related_terms")." WHERE `term` = ? OR `related` = ?;", array($robin, $robin))->num_rows,
+  relatedTermShortnames(termRow("wren_song")["id"])
+));
 checkSame("and clears values that came from the vocabulary", null, termRow("wingbeat")["range_cv"]);
 dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'wingbeat';");
 
@@ -561,8 +619,10 @@ check("and the 0.4.1 step", strpos($out, "updated to version 0.4.1</p>") !== FAL
 check("and the 0.4.2 step", strpos($out, "updated to version 0.4.2</p>") !== FALSE);
 check("and the 0.4.3 step", strpos($out, "updated to version 0.4.3</p>") !== FALSE);
 check("and the 0.4.4 step", strpos($out, "updated to version 0.4.4</p>") !== FALSE);
-checkSame("leaving the database at 0.4.4", "0.4.4", (string)getConfig()["version_db"]);
+check("and the 0.4.5 step", strpos($out, "updated to version 0.4.5</p>") !== FALSE);
+checkSame("leaving the database at 0.4.5", "0.4.5", (string)getConfig()["version_db"]);
 check("adds the acronym column, empty", array_key_exists("acronym", termRow("orphan")) && termRow("orphan")["acronym"] === null);
+check("creates the related_terms table", $db->query("SELECT 1 FROM ".table("related_terms")." LIMIT 1;") !== FALSE);
 $referenceColumn = $db->query("SHOW COLUMNS FROM ".table("terms")." LIKE 'reference';")->fetch_assoc();
 checkSame("with room for several references", "text", strtolower($referenceColumn["Type"]));
 check("email addresses must now be unique", !$db->query("INSERT INTO ".table("users")." (`email`) VALUES ('twice@example.org');"));

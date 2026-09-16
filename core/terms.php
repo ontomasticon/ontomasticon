@@ -147,8 +147,8 @@ function getTermForPage($id) {
 
 //Rows of the terms table, each with the terms related to it for showing on a page: "children" (terms it is the parent
 //of), "parent_term" (its parent term as a list, so a synonym shows the term it is a synonym of), "narrower" (valid terms
-//it is the broader term of) and "broader" (its broader term as a list, even if it is deprecated, as in RDF).
-//The related terms of the whole list are fetched at once, rather than for each term.
+//it is the broader term of), "broader" (its broader term as a list, even if it is deprecated, as in RDF) and "related"
+//(its related terms, see saveRelatedTerms()). The related terms of the whole list are fetched at once, rather than for each term.
 function withTermRelations($ret) {
   $ids = array_column($ret, "id");
   $broaderIds = array();
@@ -168,6 +168,7 @@ function withTermRelations($ret) {
   $parents  = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s);", $parentIds);
   $narrower = termsGroupedBy("broader", "SELECT * FROM ".table("terms")." WHERE `broader` IN (%s) AND `invalid_reason` IS NULL ORDER BY `shortname`;", $ids);
   $broader  = termsGroupedBy("id", "SELECT * FROM ".table("terms")." WHERE `id` IN (%s);", $broaderIds);
+  $related  = termsGroupedBy("related_to", "SELECT `r`.`term` AS `related_to`, `t`.* FROM ".table("related_terms")." AS `r` JOIN ".table("terms")." AS `t` ON `t`.`id` = `r`.`related` WHERE `r`.`term` IN (%s) ORDER BY `t`.`shortname`;", $ids);
 
   $out = array();
   foreach ($ret as $row) {
@@ -177,6 +178,7 @@ function withTermRelations($ret) {
     if ($row["broader"] != "") {
       $row["broader"] = isset($broader[$row["broader"]]) ? $broader[$row["broader"]] : array();
     }
+    $row["related"] = isset($related[$row["id"]]) ? $related[$row["id"]] : array();
     $out[] = $row;
   }
   return($out);
@@ -304,9 +306,16 @@ function termShortname($id) {
   return(null);
 }
 
-//Look up the ids of the parent and broader terms named in a term form, for the term with this shortname and, once it
-//has been saved, this id. Prints an error and returns NULL if a named term doesn't exist, is the term itself, or would
-//make a loop of parent or broader terms, which would break the hierarchy in RDF.
+//The short names in a list typed into a form, separated by commas, spaces or new lines, each given once
+function shortnameList($text) {
+  $names = preg_split('/[\s,]+/', trim(is_string($text) ? $text : ""), -1, PREG_SPLIT_NO_EMPTY);
+  return(array_values(array_unique($names)));
+}
+
+//Look up the ids of the parent, broader and related terms named in a term form, for the term with this shortname and,
+//once it has been saved, this id, as array("parent" => an id or NULL, "broader" => an id or NULL, "related" => ids).
+//Prints an error and returns NULL if a named term doesn't exist, is the term itself, or would make a loop of parent or
+//broader terms, which would break the hierarchy in RDF.
 function termRelations($shortname, $id = null) {
   $ids = array();
   foreach (array("parent", "broader") as $field) {
@@ -328,7 +337,45 @@ function termRelations($shortname, $id = null) {
       return(null);
     }
   }
+  //Related terms are named in a list (see shortnameList())
+  $ids["related"] = array();
+  foreach (shortnameList(isset($_POST["related"]) ? $_POST["related"] : "") as $name) {
+    $relatedID = termID($name);
+    if (strcasecmp($name, $shortname) == 0 || ($id !== null && $relatedID == $id)) {
+      printError(t("Not saved. A term can't be related to itself."));
+      return(null);
+    }
+    if ($relatedID === null) {
+      printError(t("Not saved. There is no term with the short name")." ".$name);
+      return(null);
+    }
+    $ids["related"][] = $relatedID;
+  }
+  $ids["related"] = array_values(array_unique($ids["related"]));
   return($ids);
+}
+
+//Make the terms with the ids in $relatedIDs the related terms of the term with id $id, in place of any it had.
+//Being related goes both ways, so a row is saved for each way round, and each term is listed as related to the other.
+//Returns FALSE if the database refuses a change.
+function saveRelatedTerms($id, $relatedIDs) {
+  if (!dbQuery("DELETE FROM ".table("related_terms")." WHERE `term` = ? OR `related` = ?;", array($id, $id))) {
+    return(FALSE);
+  }
+  foreach ($relatedIDs as $relatedID) {
+    if (!dbQuery("INSERT INTO ".table("related_terms")." (`term`, `related`) VALUES (?, ?), (?, ?);", array($id, $relatedID, $relatedID, $id))) {
+      return(FALSE);
+    }
+  }
+  return(TRUE);
+}
+
+//The short names of the related terms of the term with an id, in alphabetical order, as a term form lists them
+function relatedTermShortnames($id) {
+  $sql  = "SELECT `t`.`shortname` FROM ".table("related_terms")." AS `r` JOIN ".table("terms")." AS `t` ON `t`.`id` = `r`.`related` ";
+  $sql .= "WHERE `r`.`term` = ? ORDER BY `t`.`shortname`;";
+  $result = dbQuery($sql, array($id));
+  return(($result) ? array_column($result->fetch_all(MYSQLI_ASSOC), "shortname") : array());
 }
 
 //Whether following parent (or broader) links up from the term with id $fromID reaches the term with id $targetID.
@@ -495,6 +542,7 @@ function termValues($type) {
 }
 
 function editTerm() {
+  global $db;
   $shortname = $GLOBALS["ontomasticon"]["pageInfo"]["active_subsubpage"];
   $current = getTerm($shortname);
   $relations = termRelations($shortname, ($current == null) ? null : $current["id"]);
@@ -535,7 +583,9 @@ function editTerm() {
   $sql  = "UPDATE ".table("terms")." SET `name` = ?, `acronym` = ?, `description` = ?, `language` = ?, `opaque` = ?, `type` = ?, `range_cv` = ?, `datatype` = ?, ";
   $sql .= "`invalid_reason` = ?, `cv` = ?, `parent` = ?, `broader` = ?, `reference` = ?, `modified` = UTC_TIMESTAMP() ";
   $sql .= "WHERE `shortname` = ?;";
-  return(reportSaved(dbQuery($sql, array(
+  //The term and its related terms are saved together, or not at all
+  $db->begin_transaction();
+  $ok = dbQuery($sql, array(
     $name,
     ($acronym == "") ? null : $acronym,
     $description,
@@ -550,10 +600,17 @@ function editTerm() {
     $relations["broader"],
     $reference,
     $shortname
-  ))));
+  )) && ($current == null || saveRelatedTerms($current["id"], $relations["related"]));
+  if ($ok) {
+    $db->commit();
+  } else {
+    $db->rollback();
+  }
+  return(reportSaved($ok));
 }
 
 function addTerm() {
+  global $db;
   $shortname = trim($_POST['shortname']);
   if ($shortname == "") {
     printError(t("Not saved. A short name is required."));
@@ -602,7 +659,9 @@ function addTerm() {
 
   $sql  = "INSERT INTO ".table("terms")." (`shortname`, `name`, `acronym`, `description`, `language`, `opaque`, `type`, `range_cv`, `datatype`, `invalid_reason`, `cv`, `parent`, `broader`, `reference`, `created`, `modified`) ";
   $sql .= "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP());";
-  return(reportSaved(dbQuery($sql, array(
+  //The term and its related terms are saved together, or not at all
+  $db->begin_transaction();
+  $ok = dbQuery($sql, array(
     $shortname,
     $name,
     ($acronym == "") ? null : $acronym,
@@ -617,7 +676,13 @@ function addTerm() {
     $relations["parent"],
     $relations["broader"],
     $reference
-  )), "Term added."));
+  )) && saveRelatedTerms(termID($shortname), $relations["related"]);
+  if ($ok) {
+    $db->commit();
+  } else {
+    $db->rollback();
+  }
+  return(reportSaved($ok, "Term added."));
 }
 
 function deleteTerm() {
@@ -636,6 +701,7 @@ function deleteTerm() {
   $db->begin_transaction();
   $ok = dbQuery("UPDATE ".table("terms")." SET `parent` = NULL WHERE `parent` = ?;", array($id))
     && dbQuery("UPDATE ".table("terms")." SET `broader` = NULL WHERE `broader` = ?;", array($id))
+    && dbQuery("DELETE FROM ".table("related_terms")." WHERE `term` = ? OR `related` = ?;", array($id, $id))
     && dbQuery("DELETE FROM ".table("terms")." WHERE `id` = ?;", array($id));
   if ($ok) {
     $db->commit();
