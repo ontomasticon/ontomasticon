@@ -20,6 +20,7 @@ checkSame("with a table prefix, table names start with it", "`site_terms`", tabl
 checkSame("SQL files get the prefix on the tables they create and fill, and nowhere else",
   "DROP TABLE IF EXISTS `site_config`;\nCREATE TABLE `site_cv` (\n  `cv` varchar(50)\n);\nINSERT INTO `site_users` (email) VALUES ('terms');",
   prefixTables("DROP TABLE IF EXISTS `config`;\nCREATE TABLE `cv` (\n  `cv` varchar(50)\n);\nINSERT INTO users (email) VALUES ('terms');"));
+checkSame("including the table of related terms", "CREATE TABLE `site_related_terms` (", prefixTables("CREATE TABLE `related_terms` ("));
 check("a prefix may use letters, digits and underscores, or be empty", validTablePrefix("Site_2") && validTablePrefix(""));
 check("but nothing that could change the SQL", !validTablePrefix("a-b") && !validTablePrefix("x`; DROP") && !validTablePrefix("site\n"));
 $table_prefix = null;
@@ -361,7 +362,7 @@ section("JSON-LD");
 //A term with its relations set, so the database isn't needed
 function testTerm($row, $related = array()) {
   $term = Term::fromRow($row + array("language" => "en", "opaque" => 0));
-  foreach (array("broader" => null, "parent" => null, "narrower" => array(), "children" => array()) as $relation => $none) {
+  foreach (array("broader" => null, "parent" => null, "narrower" => array(), "children" => array(), "related" => array()) as $relation => $none) {
     $term->setRelated($relation, array_key_exists($relation, $related) ? $related[$relation] : $none);
   }
   return($term);
@@ -398,6 +399,17 @@ checkSame("and replaced by the term it is a synonym of", array("@id" => "https:/
 check("but not related to that term", !isset($ld["skos:related"]));
 check("and isn't a top concept", !isset($ld["skos:topConceptOf"]));
 checkSame("a child term that isn't a synonym is related to its parent", array(array("@id" => "https://glossary.example.org/cv/callType#AgreementSong")), termJSONLD($response)["skos:related"]);
+$rivalry = testTerm(array("id" => 7, "shortname" => "RivalrySong", "name" => "Rivalry Song", "cv" => "callType"));
+$courtship = testTerm(array("id" => 8, "shortname" => "courtship_song", "name" => "Courtship song"), array("related" => array($rivalry)));
+checkSame("links a term's related terms", array(array("@id" => "https://glossary.example.org/cv/callType#RivalrySong")), termJSONLD($courtship)["skos:related"]);
+$response->setRelated("related", array($song, $rivalry));
+checkSame("after its other related terms, linking a related term that is also its parent only once", array(
+  array("@id" => "https://glossary.example.org/cv/callType#AgreementSong"), array("@id" => "https://glossary.example.org/cv/callType#RivalrySong")
+), termJSONLD($response)["skos:related"]);
+$response->setRelated("related", array());
+checkSame("related terms are named in a list separated by commas, spaces or new lines, each once", array("chirp", "trill", "echeme"),
+  shortnameList(" chirp, trill  chirp,\r\necheme,, "));
+checkSame("and a list that isn't text names none", array(), shortnameList(array("chirp")));
 
 $ld = termJSONLD(testTerm(array("id" => 5, "shortname" => "acoustic_allometry", "name" => "acoustic allometry",
   "description" => "", "language" => "", "reference" => "https://doi.org/10.1000/example")));

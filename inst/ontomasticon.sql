@@ -40,6 +40,14 @@ CREATE TABLE `terms` (
   UNIQUE KEY `shortname_UNIQUE` (`shortname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+DROP TABLE IF EXISTS `related_terms`;
+CREATE TABLE `related_terms` (
+  `term` int(11) NOT NULL,
+  `related` int(11) NOT NULL,
+  PRIMARY KEY (`term`, `related`),
+  KEY `related` (`related`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -63,8 +71,8 @@ CREATE TABLE `login_attempts` (
   KEY `ip_attempted` (`ip`, `attempted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO config VALUES('version_db', '0.4.4');
-INSERT INTO config VALUES('version', '0.4.4');
+INSERT INTO config VALUES('version_db', '0.4.5');
+INSERT INTO config VALUES('version', '0.4.5');
 INSERT INTO config VALUES('mode', 'production');
 INSERT INTO config VALUES('default_lang', 'en');
 INSERT INTO config VALUES('description', 'Description goes here.');

@@ -32,7 +32,8 @@
 
   //The parent term is related too: a synonym shows the term it is a synonym of, as that term shows its synonyms
   $parentTerms = isset($GLOBALS["ontomasticon"]["term"]["parent_term"]) ? $GLOBALS["ontomasticon"]["term"]["parent_term"] : array();
-  if (count($parentTerms) > 0 || (is_array($GLOBALS["ontomasticon"]["term"]["children"]) && count($GLOBALS["ontomasticon"]["term"]["children"]) > 0)) {
+  $relatedTerms = (isset($GLOBALS["ontomasticon"]["term"]["related"]) && is_array($GLOBALS["ontomasticon"]["term"]["related"])) ? $GLOBALS["ontomasticon"]["term"]["related"] : array();
+  if (count($parentTerms) > 0 || count($relatedTerms) > 0 || (is_array($GLOBALS["ontomasticon"]["term"]["children"]) && count($GLOBALS["ontomasticon"]["term"]["children"]) > 0)) {
   ?>
     <h4><?php print t("Related terms"); ?></h4>
     <table>
@@ -53,6 +54,19 @@
       print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
       print "<td class='child_term_language'>".h($child["language"])."</td>";
       print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";
+      print "</tr>";
+    }
+    //Related terms that aren't already listed as the parent or a child
+    $listed = array_column(array_merge($parentTerms, is_array($GLOBALS["ontomasticon"]["term"]["children"]) ? $GLOBALS["ontomasticon"]["term"]["children"] : array()), "id");
+    foreach ($relatedTerms as $relatedTerm) {
+      if (in_array($relatedTerm["id"], $listed)) {
+        continue;
+      }
+      print "<tr>";
+      print "<td class='invalid_reason'></td>";
+      print "<td class='child_term_name'><a href='".h(term2URI($relatedTerm))."'>".h($relatedTerm["name"])."</a></td>";
+      print "<td class='child_term_language'>".h($relatedTerm["language"])."</td>";
+      print "<td class='child_term_editlink'>".termEditLink($relatedTerm["shortname"])."</td>";
       print "</tr>";
     }
     ?>

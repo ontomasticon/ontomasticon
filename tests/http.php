@@ -498,6 +498,19 @@ check("but not the license, which is now set", strpos($body, "<h3 id='license'>"
 check("the administration menu links to it", strpos($body, "<a href='/admin/readiness'>") !== FALSE);
 list(, , $body) = httpRequest("GET", "/admin/term/add");
 check("the add term page has a well-formed heading", strpos($body, "<h3>Add term</h3>") !== FALSE);
+check("and a field for related terms", strpos($body, 'name="related"') !== FALSE);
+list(, , $body) = httpRequest("POST", "/admin/term/edit/acoustic_allometry", array(
+  "csrf_token" => $token, "name" => "Acoustic allometry", "description" => "", "language" => "en", "cv" => "none", "invalid" => "none",
+  "parent" => "", "broader" => "", "related" => "opaque_term", "reference" => "", "submit" => ""
+));
+check("editing a term saves its related terms, which the form then lists",
+  strpos($body, "Saved.") !== FALSE && preg_match('/name="related"\s+value="opaque_term"/', $body) === 1);
+list(, , $body) = httpRequest("GET", "/acoustic_allometry");
+check("a term's page lists its related terms",
+  strpos($body, "<td class='invalid_reason'></td><td class='child_term_name'><a href='https://glossary.example.org/2'>Opaque term</a></td>") !== FALSE);
+list(, , $body) = httpRequest("GET", "/2");
+check("and each related term's page lists the term",
+  strpos($body, "<td class='invalid_reason'></td><td class='child_term_name'><a href='https://glossary.example.org/acoustic_allometry'>Acoustic allometry</a></td>") !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/term/edit/acoustic_allometry", array("csrf_token" => $token, "delete" => ""));
 check("deleting a term first asks to confirm deleting that one term",
   strpos($body, '<button type="submit" name="delete_term">Delete term</button>') !== FALSE && getTerm("acoustic_allometry") !== null);

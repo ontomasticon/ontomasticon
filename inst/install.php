@@ -36,11 +36,11 @@ if (!validTablePrefix(tablePrefix())) {
 <?php
 //Other sites may keep their tables in the same database, with a different table prefix
 $tables = array();
-foreach (array("config", "cv", "terms", "users", "login_attempts") as $name) {
+foreach (array("config", "cv", "terms", "related_terms", "users", "login_attempts") as $name) {
   $tables[] = tablePrefix().$name;
 }
-$stmt = $db->prepare("SELECT COUNT(*) AS `count` FROM `information_schema`.`tables` WHERE `table_schema` = DATABASE() AND `table_name` IN (?, ?, ?, ?, ?);");
-$stmt->bind_param("sssss", ...$tables);
+$stmt = $db->prepare("SELECT COUNT(*) AS `count` FROM `information_schema`.`tables` WHERE `table_schema` = DATABASE() AND `table_name` IN (?, ?, ?, ?, ?, ?);");
+$stmt->bind_param("ssssss", ...$tables);
 $stmt->execute();
 
 if ($stmt->get_result()->fetch_assoc()["count"] == 0) {

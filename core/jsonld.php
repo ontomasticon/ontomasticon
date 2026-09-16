@@ -152,7 +152,7 @@ function termNode($term) {
   }
 
   //The term's acronym and its synonyms' names are alternative labels for it, and a synonym is replaced by its parent.
-  //Other parent and child links are shown as "Related terms" on the site.
+  //Other parent and child links are shown as "Related terms" on the site, with the term's related terms.
   $altLabels = array();
   if ($term->acronym != "") {
     $altLabels[] = jsonLDText($term->acronym, $term->language);
@@ -171,11 +171,15 @@ function termNode($term) {
   } elseif ($parent != null) {
     $related[] = jsonLDLink($parent);
   }
+  foreach ($term->related() as $relatedTerm) {
+    $related[] = jsonLDLink($relatedTerm);
+  }
   if (count($altLabels) > 0) {
     $node["skos:altLabel"] = $altLabels;
   }
   if (count($related) > 0) {
-    $node["skos:related"] = $related;
+    //A related term can also be the term's parent or child, but is only linked once
+    $node["skos:related"] = array_values(array_unique($related, SORT_REGULAR));
   }
   if ($term->isDeprecated()) {
     $node["owl:deprecated"] = TRUE;
