@@ -89,11 +89,11 @@ function schemaOrgTermSetNode($vocabulary) {
 }
 
 //Data as a JSON-LD script element for a page's head. < and > are escaped, so text in the data can't end the element.
-//Empty if this PHP can't write JSON.
+//It isn't indented, as a set with all its terms can be large. Empty if this PHP can't write JSON.
 function schemaOrgScript($data) {
   if (!function_exists("json_encode")) {
     return("");
   }
-  $json = toJSON($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+  $json = toJSON($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
   return("<script type=\"application/ld+json\">\n".$json."\n</script>\n");
 }
