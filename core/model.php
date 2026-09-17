@@ -2,7 +2,7 @@
 // Ontomasticon: a simple, lightweight, PHP-based ontology browser.
 // Department of Information Retrieval
 //
-// Terms and vocabularies as objects, for output formats that follow the links between terms
+// Terms and vocabularies as objects, for the site's pages and the other formats that follow the links between terms
 
 class Term {
   public $id;
@@ -49,6 +49,18 @@ class Term {
     return($term);
   }
 
+  //The terms in the rows of a query on the terms table, such as a search, or none if the query failed
+  public static function fromResult($result) {
+    $terms = array();
+    if ($result) {
+      foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
+        $terms[] = Term::fromRow($row);
+      }
+      $result->close();
+    }
+    return($terms);
+  }
+
   //The term with a shortname, or NULL if there is no match
   public static function find($shortname) {
     return(Term::loadOne("`shortname` = ?", array($shortname)));
@@ -57,6 +69,11 @@ class Term {
   //The term with an id, or NULL if there is no match
   public static function findByID($id) {
     return(Term::loadOne("`id` = ?", array($id)));
+  }
+
+  //The terms with the ids in a list, in order of short name
+  public static function findByIDs($ids) {
+    return(Term::loadLinked(array_values(array_unique($ids)), array()));
   }
 
   //Every term, in and outside vocabularies, including deprecated ones
@@ -90,8 +107,15 @@ class Term {
     return(Term::loadAll("`cv` = ?", array($shortname)));
   }
 
-  //Load the related terms of a list of terms with four queries in all, rather than several for each term
+  //Load the related terms of a list of terms with two queries in all, rather than several for each term
   public static function loadRelations($terms) {
+    //A long list is loaded in parts, as a query can have at most 65,535 placeholders
+    if (count($terms) > 5000) {
+      foreach (array_chunk($terms, 5000) as $part) {
+        Term::loadRelations($part);
+      }
+      return;
+    }
     $ids = array();
     $linkedIDs = array();
     foreach ($terms as $term) {
@@ -106,22 +130,56 @@ class Term {
     foreach ($relatedIDs as $termRelatedIDs) {
       $linkedIDs = array_merge($linkedIDs, $termRelatedIDs);
     }
-    $byID = Term::groupBy("id", Term::loadIn("`id`", $linkedIDs));
-    $narrower = Term::groupBy("broaderID", Term::loadIn("`broader`", $ids, " AND `invalid_reason` IS NULL"));
-    $children = Term::groupBy("parentID", Term::loadIn("`parent`", $ids));
+    $linked = array_flip(array_unique($linkedIDs));
+    $listed = array_flip(array_unique($ids));
+    $byID = array();
+    $narrower = array();
+    $children = array();
+    foreach (Term::loadLinked(array_keys($linked), array_keys($listed)) as $other) {
+      if (isset($linked[$other->id])) {
+        $byID[$other->id] = $other;
+      }
+      //Deprecated terms aren't narrower terms
+      if ($other->broaderID != null && isset($listed[$other->broaderID]) && $other->invalidReason === null) {
+        $narrower[$other->broaderID][] = $other;
+      }
+      if ($other->parentID != null && isset($listed[$other->parentID])) {
+        $children[$other->parentID][] = $other;
+      }
+    }
     foreach ($terms as $term) {
-      $term->setRelated("broader", ($term->broaderID != null && isset($byID[$term->broaderID])) ? $byID[$term->broaderID][0] : null);
-      $term->setRelated("parent", ($term->parentID != null && isset($byID[$term->parentID])) ? $byID[$term->parentID][0] : null);
+      $term->setRelated("broader", ($term->broaderID != null && isset($byID[$term->broaderID])) ? $byID[$term->broaderID] : null);
+      $term->setRelated("parent", ($term->parentID != null && isset($byID[$term->parentID])) ? $byID[$term->parentID] : null);
       $term->setRelated("narrower", isset($narrower[$term->id]) ? $narrower[$term->id] : array());
       $term->setRelated("children", isset($children[$term->id]) ? $children[$term->id] : array());
       $related = array();
       foreach (isset($relatedIDs[$term->id]) ? $relatedIDs[$term->id] : array() as $id) {
         if (isset($byID[$id])) {
-          $related[] = $byID[$id][0];
+          $related[] = $byID[$id];
         }
       }
       $term->setRelated("related", $related);
     }
+  }
+
+  //Terms with one of the ids in $ids, or whose broader term or parent has one of the ids in $linkedTo, in order of short name
+  private static function loadLinked($ids, $linkedTo) {
+    $conditions = array();
+    $params = array();
+    if (count($ids) > 0) {
+      $conditions[] = "`id` IN (".Term::placeholders($ids).")";
+      $params = $ids;
+    }
+    if (count($linkedTo) > 0) {
+      $conditions[] = "`broader` IN (".Term::placeholders($linkedTo).") OR `parent` IN (".Term::placeholders($linkedTo).")";
+      $params = array_merge($params, $linkedTo, $linkedTo);
+    }
+    return((count($conditions) == 0) ? array() : Term::loadAll(implode(" OR ", $conditions), $params));
+  }
+
+  //Placeholders for a list of values in a query, such as "?, ?, ?"
+  private static function placeholders($values) {
+    return(implode(", ", array_fill(0, count($values), "?")));
   }
 
   //The ids of the related terms (see saveRelatedTerms()) of each of the terms with the ids in $ids, as a term's id => the
@@ -133,7 +191,7 @@ class Term {
       return($related);
     }
     $sql  = "SELECT `r`.`term`, `r`.`related` FROM ".table("related_terms")." AS `r` JOIN ".table("terms")." AS `t` ON `t`.`id` = `r`.`related` ";
-    $sql .= "WHERE `r`.`term` IN (".implode(", ", array_fill(0, count($ids), "?")).") ORDER BY `t`.`shortname`;";
+    $sql .= "WHERE `r`.`term` IN (".Term::placeholders($ids).") ORDER BY `t`.`shortname`;";
     $result = dbQuery($sql, $ids);
     if ($result) {
       foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
@@ -146,39 +204,12 @@ class Term {
 
   //Terms matching a condition on the terms table, with ? placeholders filled from $params
   private static function loadAll($where, $params) {
-    $terms = array();
-    $result = dbQuery("SELECT * FROM ".table("terms")." WHERE ".$where." ORDER BY `shortname`;", $params);
-    if ($result) {
-      foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
-        $terms[] = Term::fromRow($row);
-      }
-      $result->close();
-    }
-    return($terms);
+    return(Term::fromResult(dbQuery("SELECT * FROM ".table("terms")." WHERE ".$where." ORDER BY `shortname`;", $params)));
   }
 
   private static function loadOne($where, $params) {
     $terms = Term::loadAll($where, $params);
     return((count($terms) > 0) ? $terms[0] : null);
-  }
-
-  //Terms whose $column is one of $values, and that meet any further $condition
-  private static function loadIn($column, $values, $condition = "") {
-    $values = array_values(array_unique($values));
-    if (count($values) == 0) {
-      return(array());
-    }
-    $placeholders = implode(", ", array_fill(0, count($values), "?"));
-    return(Term::loadAll($column." IN (".$placeholders.")".$condition, $values));
-  }
-
-  //Terms grouped into lists by the value of one of their properties
-  private static function groupBy($property, $terms) {
-    $grouped = array();
-    foreach ($terms as $term) {
-      $grouped[$term->$property][] = $term;
-    }
-    return($grouped);
   }
 
   //The term's URI: the site address followed by its shortname, or its id if the term is opaque.
@@ -290,13 +321,19 @@ class Vocabulary {
     $this->license = configValue("license");
   }
 
-  //The vocabulary with a shortname, or NULL if there is no match
-  public static function find($shortname) {
+  //The vocabulary with a shortname, or NULL if there is no match. Rows of the cv table that are already loaded, keyed by
+  //shortname as getCVs() gives them, are used when one has exactly this shortname, so the database isn't asked again.
+  public static function find($shortname, $loaded = array()) {
+    if (is_string($shortname) && isset($loaded[$shortname])) {
+      return(Vocabulary::fromRow($loaded[$shortname]));
+    }
     $result = dbQuery("SELECT * FROM ".table("cv")." WHERE `shortname` = ?;", array($shortname));
     $row = ($result) ? $result->fetch_assoc() : null;
-    if ($row == null) {
-      return(null);
-    }
+    return(($row == null) ? null : Vocabulary::fromRow($row));
+  }
+
+  //A vocabulary from a row of the cv table
+  public static function fromRow($row) {
     $vocabulary = new Vocabulary($row["shortname"]);
     $vocabulary->name = $row["name"];
     $vocabulary->description = $row["description"];

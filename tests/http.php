@@ -226,13 +226,13 @@ check("with the terms that aren't in a vocabulary", in_array("https://glossary.e
 list($status, , $body) = httpRequest("GET", "/api/cv/?shortname=missing");
 check("a missing vocabulary is not found", $status == 404 && $body === "");
 $db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES ('opaque_call', 'Opaque call', 'en', 1, 'calls');");
-$opaqueCall = getTerm("opaque_call");
+$opaqueCall = Term::find("opaque_call");
 list(, , $body) = httpRequest("GET", "/cv/calls");
 check("the vocabulary page has an entry for each term, at the fragment of its URI",
-  strpos($body, 'id="calling_song"') !== FALSE && strpos(term2URI(getTerm("calling_song")), "#calling_song") !== FALSE);
+  strpos($body, 'id="calling_song"') !== FALSE && strpos(Term::find("calling_song")->uri(), "#calling_song") !== FALSE);
 check("an opaque term's entry is at its id, as its URI is",
-  strpos($body, 'id="'.$opaqueCall["id"].'"') !== FALSE && strpos($body, 'id="opaque_call"') === FALSE
-  && term2URI($opaqueCall) === "https://glossary.example.org/cv/calls#".$opaqueCall["id"]);
+  strpos($body, 'id="'.$opaqueCall->id.'"') !== FALSE && strpos($body, 'id="opaque_call"') === FALSE
+  && $opaqueCall->uri() === "https://glossary.example.org/cv/calls#".$opaqueCall->id);
 list(, , $body) = httpRequest("GET", "/");
 check("the home page lists terms in order of short name, as vocabulary pages do",
   strpos($body, 'id="acoustic_allometry"') < strpos($body, 'id="agreement_song"') && strpos($body, 'id="agreement_song"') < strpos($body, 'id="2"'));
@@ -457,7 +457,7 @@ $db->query("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `op
 $synonymRow = "<td class='invalid_reason'>Synonym</td><td class='child_term_name'><a href='https://glossary.example.org/cv/calls#song_call'>Song call</a></td>";
 list(, , $body) = httpRequest("GET", "/cv/calls");
 check("a synonym in a vocabulary has no entry of its own, so its row in its term's entry is at the fragment of its URI",
-  strpos($body, "<tr id='song_call'>".$synonymRow) !== FALSE && substr(term2URI(getTerm("song_call")), -strlen("#song_call")) === "#song_call");
+  strpos($body, "<tr id='song_call'>".$synonymRow) !== FALSE && substr(Term::find("song_call")->uri(), -strlen("#song_call")) === "#song_call");
 $db->query("UPDATE ".table("terms")." SET `broader` = ".(int)getTerm("song_call")["id"]." WHERE `shortname` = 'rivalry_call';");
 list(, , $body) = httpRequest("GET", "/cv/calls");
 check("a term's page shows its broader term even when that term is deprecated, as its RDF does", substr_count($body, $synonymRow) == 2);

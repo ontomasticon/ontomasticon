@@ -1,72 +1,75 @@
-<div class="term <?php print $GLOBALS["ontomasticon"]["oddeven"]; ?>" id="<?php print h(termAnchor($GLOBALS["ontomasticon"]["term"])); ?>">
+<?php
+//A term's entry, for the term in $GLOBALS["ontomasticon"]["term"], with its related terms loaded
+$term = $GLOBALS["ontomasticon"]["term"];
+?>
+<div class="term <?php print $GLOBALS["ontomasticon"]["oddeven"]; ?>" id="<?php print h($term->anchor()); ?>">
   <h3><?php
-    print h($GLOBALS["ontomasticon"]["term"]["name"]);
+    print h($term->name);
     print " ";
-    print termEditLink($GLOBALS["ontomasticon"]["term"]["shortname"]);
+    print termEditLink($term->shortname);
   ?></h3>
-  <p class="term-uri"><?php print term2URI($GLOBALS["ontomasticon"]["term"], TRUE); ?></p>
+  <p class="term-uri"><?php print l($term->uri(), $term->uri()); ?></p>
   <?php
   //A glossary gives a term's acronym
-  if (isGlossary() && isset($GLOBALS["ontomasticon"]["term"]["acronym"]) && $GLOBALS["ontomasticon"]["term"]["acronym"] != "") {
-    print '<p class="term-acronym">'.h(t("Acronym")).": ".h($GLOBALS["ontomasticon"]["term"]["acronym"]).'</p>';
+  if (isGlossary() && $term->acronym != "") {
+    print '<p class="term-acronym">'.h(t("Acronym")).": ".h($term->acronym).'</p>';
   }
   //Most terms are concepts, so only other types are shown
-  $termType = termType(isset($GLOBALS["ontomasticon"]["term"]["type"]) ? $GLOBALS["ontomasticon"]["term"]["type"] : null);
-  if ($termType != "concept") {
-    print '<p class="term-type">'.h(t(termTypeLabels()[$termType])).'</p>';
+  if ($term->type != "concept") {
+    print '<p class="term-type">'.h(t(termTypeLabels()[$term->type])).'</p>';
   }
   //Where a property's values come from
-  $termRow = $GLOBALS["ontomasticon"]["term"];
   $datatypes = termDatatypes();
-  if ($termType == "property" && isset($termRow["datatype"]) && isset($datatypes[$termRow["datatype"]])) {
-    print '<p class="term-values">'.h(t("Values")).": ".h(t($datatypes[$termRow["datatype"]]["label"])).'</p>';
-  } elseif ($termType == "property" && isset($termRow["range_cv"]) && isset($GLOBALS["ontomasticon"]["CVs"][$termRow["range_cv"]])) {
-    $valuesCV = $GLOBALS["ontomasticon"]["CVs"][$termRow["range_cv"]];
+  if ($term->type == "property" && isset($datatypes[(string)$term->datatype])) {
+    print '<p class="term-values">'.h(t("Values")).": ".h(t($datatypes[$term->datatype]["label"])).'</p>';
+  } elseif ($term->type == "property" && isset($GLOBALS["ontomasticon"]["CVs"][(string)$term->rangeCV])) {
+    $valuesCV = $GLOBALS["ontomasticon"]["CVs"][$term->rangeCV];
     print '<p class="term-values">'.h(t("Values")).": ".l($valuesCV["name"], "/cv/".$valuesCV["shortname"]).'</p>';
   }
   ?>
-  <p class="term-language"><?php print h($GLOBALS["ontomasticon"]["term"]["language"]); ?></p>
-  <p class="term-description"><?php print $GLOBALS["ontomasticon"]["term"]["description"]; ?></p>
+  <p class="term-language"><?php print h($term->language); ?></p>
+  <p class="term-description"><?php print $term->description; ?></p>
   <?php
   template("term-fragment-reference.php");
 
   //The parent term is related too: a synonym shows the term it is a synonym of, as that term shows its synonyms
-  $parentTerms = isset($GLOBALS["ontomasticon"]["term"]["parent_term"]) ? $GLOBALS["ontomasticon"]["term"]["parent_term"] : array();
-  $relatedTerms = (isset($GLOBALS["ontomasticon"]["term"]["related"]) && is_array($GLOBALS["ontomasticon"]["term"]["related"])) ? $GLOBALS["ontomasticon"]["term"]["related"] : array();
-  if (count($parentTerms) > 0 || count($relatedTerms) > 0 || (is_array($GLOBALS["ontomasticon"]["term"]["children"]) && count($GLOBALS["ontomasticon"]["term"]["children"]) > 0)) {
+  $parentTerms = ($term->parent() === null) ? array() : array($term->parent());
+  $children = termPageChildren($term);
+  $relatedTerms = $term->related();
+  if (count($parentTerms) > 0 || count($relatedTerms) > 0 || count($children) > 0) {
   ?>
     <h4><?php print t("Related terms"); ?></h4>
     <table>
     <?php
     foreach ($parentTerms as $parentTerm) {
       print "<tr>";
-      print "<td class='invalid_reason'>".(($GLOBALS["ontomasticon"]["term"]["invalid_reason"] == "Synonym") ? h(t("Synonym of")) : "")."</td>";
-      print "<td class='child_term_name'><a href='".h(term2URI($parentTerm))."'>".h($parentTerm["name"])."</a></td>";
-      print "<td class='child_term_language'>".h($parentTerm["language"])."</td>";
-      print "<td class='child_term_editlink'>".termEditLink($parentTerm["shortname"])."</td>";
+      print "<td class='invalid_reason'>".(($term->isSynonym()) ? h(t("Synonym of")) : "")."</td>";
+      print "<td class='child_term_name'><a href='".h($parentTerm->uri())."'>".h($parentTerm->name)."</a></td>";
+      print "<td class='child_term_language'>".h($parentTerm->language)."</td>";
+      print "<td class='child_term_editlink'>".termEditLink($parentTerm->shortname)."</td>";
       print "</tr>";
     }
-    foreach ((is_array($GLOBALS["ontomasticon"]["term"]["children"]) ? $GLOBALS["ontomasticon"]["term"]["children"] : array()) as $child) {
+    foreach ($children as $child) {
       //A synonym in a vocabulary has no entry of its own, so the fragment of its URI is its row here, in the entry of the term it is a synonym of
-      $synonymHere = ($child["invalid_reason"] == "Synonym" && $child["cv"] != "" && $child["cv"] == $GLOBALS["ontomasticon"]["term"]["cv"]);
-      print "<tr".(($synonymHere) ? " id='".h(termAnchor($child))."'" : "").">";
-      print "<td class='invalid_reason'>".h(t($child["invalid_reason"]))."</td>";
-      print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
-      print "<td class='child_term_language'>".h($child["language"])."</td>";
-      print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";
+      $synonymHere = ($child->isSynonym() && $child->cv != "" && $child->cv == $term->cv);
+      print "<tr".(($synonymHere) ? " id='".h($child->anchor())."'" : "").">";
+      print "<td class='invalid_reason'>".h(t($child->invalidReason))."</td>";
+      print "<td class='child_term_name'><a href='".h($child->uri())."'>".h($child->name)."</a></td>";
+      print "<td class='child_term_language'>".h($child->language)."</td>";
+      print "<td class='child_term_editlink'>".termEditLink($child->shortname)."</td>";
       print "</tr>";
     }
     //Related terms that aren't already listed as the parent or a child
-    $listed = array_column(array_merge($parentTerms, is_array($GLOBALS["ontomasticon"]["term"]["children"]) ? $GLOBALS["ontomasticon"]["term"]["children"] : array()), "id");
+    $listed = array_column(array_merge($parentTerms, $children), "id");
     foreach ($relatedTerms as $relatedTerm) {
-      if (in_array($relatedTerm["id"], $listed)) {
+      if (in_array($relatedTerm->id, $listed)) {
         continue;
       }
       print "<tr>";
       print "<td class='invalid_reason'></td>";
-      print "<td class='child_term_name'><a href='".h(term2URI($relatedTerm))."'>".h($relatedTerm["name"])."</a></td>";
-      print "<td class='child_term_language'>".h($relatedTerm["language"])."</td>";
-      print "<td class='child_term_editlink'>".termEditLink($relatedTerm["shortname"])."</td>";
+      print "<td class='child_term_name'><a href='".h($relatedTerm->uri())."'>".h($relatedTerm->name)."</a></td>";
+      print "<td class='child_term_language'>".h($relatedTerm->language)."</td>";
+      print "<td class='child_term_editlink'>".termEditLink($relatedTerm->shortname)."</td>";
       print "</tr>";
     }
     ?>
@@ -76,17 +79,18 @@
   ?>
 
   <?php
-  if (is_array($GLOBALS["ontomasticon"]["term"]["broader"]) && count($GLOBALS["ontomasticon"]["term"]["broader"]) > 0) {
+  $broaderTerms = ($term->broader() === null) ? array() : array($term->broader());
+  if (count($broaderTerms) > 0) {
     ?>
     <h4><?php print t("Broader term"); ?></h4>
     <table>
     <?php
-    foreach ($GLOBALS["ontomasticon"]["term"]["broader"] as $child) {
+    foreach ($broaderTerms as $child) {
       print "<tr>";
-      print "<td class='invalid_reason'>".h(t($child["invalid_reason"]))."</td>";
-      print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
-      print "<td class='child_term_language'>".h($child["language"])."</td>";
-      print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";
+      print "<td class='invalid_reason'>".h(t($child->invalidReason))."</td>";
+      print "<td class='child_term_name'><a href='".h($child->uri())."'>".h($child->name)."</a></td>";
+      print "<td class='child_term_language'>".h($child->language)."</td>";
+      print "<td class='child_term_editlink'>".termEditLink($child->shortname)."</td>";
       print "</tr>";
     }
     ?>
@@ -96,17 +100,17 @@
   ?>
 
   <?php
-  if (is_array($GLOBALS["ontomasticon"]["term"]["narrower"]) && count($GLOBALS["ontomasticon"]["term"]["narrower"]) > 0) {
+  if (count($term->narrower()) > 0) {
     ?>
     <h4><?php print t("Narrower terms"); ?></h4>
     <table>
     <?php
-    foreach ($GLOBALS["ontomasticon"]["term"]["narrower"] as $child) {
+    foreach ($term->narrower() as $child) {
       print "<tr>";
-      print "<td class='invalid_reason'>".h(t($child["invalid_reason"]))."</td>";
-      print "<td class='child_term_name'><a href='".h(term2URI($child))."'>".h($child["name"])."</a></td>";
-      print "<td class='child_term_language'>".h($child["language"])."</td>";
-      print "<td class='child_term_editlink'>".termEditLink($child["shortname"])."</td>";
+      print "<td class='invalid_reason'>".h(t($child->invalidReason))."</td>";
+      print "<td class='child_term_name'><a href='".h($child->uri())."'>".h($child->name)."</a></td>";
+      print "<td class='child_term_language'>".h($child->language)."</td>";
+      print "<td class='child_term_editlink'>".termEditLink($child->shortname)."</td>";
       print "</tr>";
     }
     ?>

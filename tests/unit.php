@@ -72,15 +72,15 @@ $GLOBALS["ontomasticon"]["config"]["base_url"] = "http://glossary.example.org/";
 checkSame("keeps an http:// base_url", "http://glossary.example.org/", siteURL());
 $GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/";
 checkSame("term outside a vocabulary", "https://glossary.example.org/acoustic_allometry",
-  term2URI(array("id" => 1, "shortname" => "acoustic_allometry", "cv" => null, "opaque" => 0)));
+  Term::fromRow(array("id" => 1, "shortname" => "acoustic_allometry", "cv" => null, "opaque" => 0))->uri());
 checkSame("term in a vocabulary", "https://glossary.example.org/cv/birds#song",
-  term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
+  Term::fromRow(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0))->uri());
 checkSame("opaque term uses its id", "https://glossary.example.org/cv/birds#7",
-  term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 1)));
+  Term::fromRow(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 1))->uri());
 checkSame("a term's entry on the page is named by its shortname", "song",
-  termAnchor(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
+  (string)Term::fromRow(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0))->anchor());
 checkSame("an opaque term's entry is named by its id, matching the fragment of its URI", "7",
-  termAnchor(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 1)));
+  (string)Term::fromRow(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 1))->anchor());
 
 section("Short names");
 check("letters, digits, hyphens, underscores and full stops are allowed", validShortname("Bird_song-2.1"));
@@ -187,8 +187,8 @@ function pageFor($pageInfo, $term = null) {
   $GLOBALS["ontomasticon"]["pageTerm"] = $term;
   return(array("title" => pageTitle(), "description" => pageDescription(), "canonical" => canonicalURL(), "notFound" => pageNotFound()));
 }
-$allometry = array("id" => 1, "shortname" => "acoustic_allometry", "name" => "acoustic allometry", "cv" => null, "opaque" => 0,
-  "description" => "<p>The larger the animal, the lower its calls.</p>");
+$allometry = Term::fromRow(array("id" => 1, "shortname" => "acoustic_allometry", "name" => "acoustic allometry", "cv" => null, "opaque" => 0,
+  "description" => "<p>The larger the animal, the lower its calls.</p>"));
 checkSame("a term's page is titled and described by the term, with its URI as the canonical address", array(
   "title" => "acoustic allometry – Bioacoustics Glossary", "description" => "The larger the animal, the lower its calls.",
   "canonical" => "https://glossary.example.org/acoustic_allometry", "notFound" => FALSE
@@ -239,7 +239,7 @@ checkSame("links to the site's pages include the subdirectory", "<a href='/terms
 checkSame("links to other sites don't", "<a href='https://example.org/'>x</a>", l("x", "https://example.org/"));
 checkSame("linked data links include it", "/terms/api/cv/", linkedDataFor(array("page_type" => "home")));
 checkSame("term URIs include it", "https://glossary.example.org/terms/cv/birds#song",
-  term2URI(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0)));
+  Term::fromRow(array("id" => 7, "shortname" => "song", "cv" => "birds", "opaque" => 0))->uri());
 unset($GLOBALS["ontomasticon"]["pageInfo"]);
 $GLOBALS["ontomasticon"]["config"]["base_url"] = "glossary.example.org/";
 section("Choosing a language");
@@ -749,36 +749,48 @@ checkSame("the readiness report lists properties without values, values from a m
   array("values" => array("PulseCount"), "values-vocabulary" => array("SoundPropagationMedium"), "values-not-property" => array("Echeme")), $valueIssues);
 unset($GLOBALS["ontomasticon"]["CVs"]);
 
+section("Term entries on pages");
+$noiseB = testTerm(array("id" => 61, "shortname" => "noise_b", "name" => "Noise B", "parent" => 60, "invalid_reason" => "Synonym"));
+$wind = testTerm(array("id" => 62, "shortname" => "wind", "name" => "Wind", "parent" => 60));
+$noiseA = testTerm(array("id" => 63, "shortname" => "noise_a", "name" => "Noise A", "parent" => 60, "invalid_reason" => "Synonym"));
+$windSound = testTerm(array("id" => 60, "shortname" => "sound", "name" => "Sound"), array("children" => array($noiseA, $noiseB, $wind)));
+checkSame("pages list the terms that aren't deprecated", array("sound", "wind"), array_column(validTerms(array($noiseA, $windSound, $wind)), "shortname"));
+checkSame("a term's entry lists its other child terms before its synonyms, each in the order they were loaded", array("wind", "noise_a", "noise_b"),
+  array_column(termPageChildren($windSound), "shortname"));
+
 section("Glossaries");
 check("a site isn't a glossary unless it says so", !isGlossary());
 $GLOBALS["ontomasticon"]["config"]["glossary_display"] = "1";
 check("and is when it does", isGlossary());
 unset($GLOBALS["ontomasticon"]["config"]["glossary_display"]);
-$groups = glossaryGroups(array(
-  array("shortname" => "zebra_finch", "name" => "zebra finch"),
-  array("shortname" => "Echo", "name" => "Echo"),
-  array("shortname" => "alarm_call", "name" => "Alarm call"),
-  array("shortname" => "tone_2khz", "name" => "2 kHz tone"),
-  array("shortname" => "unnamed", "name" => ""),
-  array("shortname" => "echeme", "name" => "echeme")
-));
+$groups = glossaryGroups(glossaryEntries(array(
+  testTerm(array("id" => 1, "shortname" => "zebra_finch", "name" => "zebra finch")),
+  testTerm(array("id" => 2, "shortname" => "Echo", "name" => "Echo")),
+  testTerm(array("id" => 3, "shortname" => "alarm_call", "name" => "Alarm call")),
+  testTerm(array("id" => 4, "shortname" => "tone_2khz", "name" => "2 kHz tone")),
+  testTerm(array("id" => 5, "shortname" => "unnamed", "name" => "")),
+  testTerm(array("id" => 6, "shortname" => "echeme", "name" => "echeme"))
+)));
+$entryShortnames = function($entries) {
+  return(array_map(function($entry) { return($entry["term"]->shortname); }, $entries));
+};
 checkSame("groups terms by the first letter of their names, ignoring case, with other characters first",
   array("#", "A", "E", "U", "Z"), array_keys($groups));
-checkSame("sorts the terms under a letter alphabetically, ignoring case", array("echeme", "Echo"), array_column($groups["E"], "shortname"));
-checkSame("files a term without a name under its short name", array("unnamed"), array_column($groups["U"], "shortname"));
+checkSame("sorts the terms under a letter alphabetically, ignoring case", array("echeme", "Echo"), $entryShortnames($groups["E"]));
+checkSame("files a term without a name under its short name", array("unnamed"), $entryShortnames($groups["U"]));
 $index = glossaryIndex($groups);
 check("links to the letters that have terms", strpos($index, '<a href="#glossary:A">A</a>') !== FALSE && strpos($index, '<a href="#glossary:other">#</a>') !== FALSE);
 check("and shows the others without a link", strpos($index, '<span class="glossary-index-empty">B</span>') !== FALSE && strpos($index, 'href="#glossary:B"') === FALSE);
 checkSame("lists every letter from A to Z", 27, preg_match_all('/>[A-Z#]</', $index));
 check("leaves out # when no term is filed under it", strpos(glossaryIndex(array("A" => array())), "#</") === FALSE);
 $groups = glossaryGroups(glossaryEntries(array(
-  array("id" => 50, "shortname" => "passive_acoustic_monitoring", "name" => "Passive acoustic monitoring", "acronym" => "PAM"),
-  array("id" => 51, "shortname" => "echo", "name" => "Echo", "acronym" => "ECHO"),
-  array("id" => 52, "shortname" => "sonar", "name" => "Sonar", "acronym" => null)
+  testTerm(array("id" => 50, "shortname" => "passive_acoustic_monitoring", "name" => "Passive acoustic monitoring", "acronym" => "PAM")),
+  testTerm(array("id" => 51, "shortname" => "echo", "name" => "Echo", "acronym" => "ECHO")),
+  testTerm(array("id" => 52, "shortname" => "sonar", "name" => "Sonar", "acronym" => null))
 )));
-checkSame("lists a term's acronym under its own letter as well, pointing to the term", array("PAM", "passive_acoustic_monitoring"),
-  array($groups["P"][0]["name"], $groups["P"][0]["see"]["shortname"]));
-checkSame("but not an acronym that is just the term's name", array("echo"), array_column($groups["E"], "shortname"));
+checkSame("lists a term's acronym under its own letter as well, pointing to the term", array("PAM", TRUE, "passive_acoustic_monitoring"),
+  array($groups["P"][0]["label"], $groups["P"][0]["see"], $groups["P"][0]["term"]->shortname));
+checkSame("but not an acronym that is just the term's name", array("echo"), $entryShortnames($groups["E"]));
 checkSame("a term without an acronym is listed once", 1, count($groups["S"]));
 checkSame("an acronym is too long for the database above 50 characters", array(null, TRUE),
   array(termAcronymError(str_repeat("A", 50)), termAcronymError(str_repeat("A", 51)) !== null));

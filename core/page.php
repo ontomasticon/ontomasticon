@@ -160,9 +160,16 @@ function linkedDataURL($format = "jsonld") {
   return(null);
 }
 
-//The term the current address is a page for, as getTermForPage() gives it, or NULL if there is none
+//The term the current address is a page for, with its related terms loaded, or NULL if there is none
 function currentPageTerm() {
   return(isset($GLOBALS["ontomasticon"]["pageTerm"]) ? $GLOBALS["ontomasticon"]["pageTerm"] : null);
+}
+
+//The terms of the home page (the site's terms that aren't in a vocabulary, which an address that should be a term's but
+//isn't lists too) or of a vocabulary's page, including deprecated ones, with their related terms loaded. The page lists
+//them and describes them in its head. None for other pages.
+function currentPageTerms() {
+  return(isset($GLOBALS["ontomasticon"]["pageTerms"]) ? $GLOBALS["ontomasticon"]["pageTerms"] : array());
 }
 
 //The controlled vocabulary the current address is a page for, as a row of the cv table, or NULL if there is none
@@ -194,8 +201,8 @@ function pageTitle() {
   }
   $term = currentPageTerm();
   $vocabulary = currentPageVocabulary();
-  if ($term !== null && $term["name"] != "") {
-    return($term["name"]." – ".$site);
+  if ($term !== null && $term->name != "") {
+    return($term->name." – ".$site);
   }
   if ($vocabulary !== null && $vocabulary["name"] != "") {
     return($vocabulary["name"]." – ".$site);
@@ -208,7 +215,7 @@ function pageTitle() {
 function pageDescription() {
   $text = "";
   if (currentPageTerm() !== null) {
-    $text = plainText(currentPageTerm()["description"]);
+    $text = plainText(currentPageTerm()->description);
   } elseif (currentPageVocabulary() !== null) {
     $text = plainText(currentPageVocabulary()["description"]);
   }
@@ -226,7 +233,7 @@ function canonicalURL() {
     return(siteURL());
   }
   if (currentPageTerm() !== null) {
-    return(Term::fromRow(currentPageTerm())->uri());
+    return(currentPageTerm()->uri());
   }
   if (currentPageVocabulary() !== null) {
     return((new Vocabulary(currentPageVocabulary()["shortname"]))->uri());
@@ -239,17 +246,15 @@ function canonicalURL() {
 function pageStructuredData() {
   $page = $GLOBALS["ontomasticon"]["pageInfo"];
   if ($page["page_type"] == "home") {
-    $vocabulary = Vocabulary::site();
-    return(schemaOrgTermSetJSONLD($vocabulary, $vocabulary->terms()));
+    return(schemaOrgTermSetJSONLD(Vocabulary::site(), currentPageTerms()));
   }
   if (currentPageTerm() !== null) {
-    $term = Term::fromRow(currentPageTerm());
-    $vocabulary = ($term->cv == null) ? Vocabulary::site() : Vocabulary::find($term->cv);
+    $term = currentPageTerm();
+    $vocabulary = ($term->cv == null) ? Vocabulary::site() : Vocabulary::find($term->cv, $GLOBALS["ontomasticon"]["CVs"]);
     return(schemaOrgTermJSONLD($term, ($vocabulary === null) ? $term->vocabulary() : $vocabulary));
   }
   if (currentPageVocabulary() !== null) {
-    $vocabulary = Vocabulary::find(currentPageVocabulary()["shortname"]);
-    return(($vocabulary === null) ? null : schemaOrgTermSetJSONLD($vocabulary, $vocabulary->terms()));
+    return(schemaOrgTermSetJSONLD(Vocabulary::fromRow(currentPageVocabulary()), currentPageTerms()));
   }
   return(null);
 }

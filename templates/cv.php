@@ -27,6 +27,6 @@ if ($activeCV == null) {
   <h2><?php print t("Controlled Vocabulary").": ".h($activeCV["name"]); ?></h2>
   <div id="description"><?php print $activeCV["description"]; ?></div>
 <?php
-  $GLOBALS["ontomasticon"]["terms"] = getTerms($activeCV["shortname"]);
+  $GLOBALS["ontomasticon"]["terms"] = validTerms(currentPageTerms());
   template("term-list.php");
 }

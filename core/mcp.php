@@ -504,10 +504,10 @@ function mcpSearchTerms($arguments) {
     return(mcpToolError("The limit must be a whole number from 1 to ".MCP_SEARCH_LIMIT."."));
   }
   //One more term than the limit shows whether there are more
-  $rows = searchTerms($query, $limit + 1);
+  $terms = searchTerms($query, $limit + 1);
   return(mcpToolResult(array(
-    "terms" => array_map("mcpTermSummary", array_slice($rows, 0, $limit)),
-    "more" => count($rows) > $limit
+    "terms" => array_map("mcpTermSummary", array_slice($terms, 0, $limit)),
+    "more" => count($terms) > $limit
   )));
 }
 
@@ -622,11 +622,11 @@ function mcpListTerms($arguments) {
   $params = ($shortname === null) ? array() : array($shortname);
   $result = dbQuery("SELECT COUNT(*) AS `count` FROM ".table("terms")." WHERE ".$where.";", $params);
   $total = ($result) ? (int)$result->fetch_assoc()["count"] : 0;
-  $result = dbQuery("SELECT * FROM ".table("terms")." WHERE ".$where." ORDER BY `name`, `shortname` LIMIT ".MCP_TERMS_PAGE." OFFSET ".$offset.";", $params);
-  $rows = ($result) ? $result->fetch_all(MYSQLI_ASSOC) : array();
+  $terms = Term::fromResult(dbQuery("SELECT * FROM ".table("terms")." WHERE ".$where." ORDER BY `name`, `shortname` LIMIT ".MCP_TERMS_PAGE." OFFSET ".$offset.";", $params));
+  Term::loadRelations($terms);
   return(mcpToolResult(array(
     "vocabulary" => mcpVocabulary($shortname),
-    "terms" => array_map("mcpTermSummary", withTermRelations($rows)),
+    "terms" => array_map("mcpTermSummary", $terms),
     "total" => $total,
     "offset" => $offset,
     "next_offset" => ($offset + MCP_TERMS_PAGE < $total) ? $offset + MCP_TERMS_PAGE : null
@@ -653,22 +653,22 @@ function mcpVocabulary($shortname) {
   return(array("shortname" => (string)$shortname, "name" => $name, "uri" => (new Vocabulary($shortname))->uri()));
 }
 
-//A row of the terms table with its related terms (see withTermRelations()), where tools list several terms
-function mcpTermSummary($row) {
+//A term with its related terms loaded (see Term::loadRelations()), where tools list several terms
+function mcpTermSummary($term) {
   $synonyms = array();
-  foreach ($row["children"] as $child) {
-    if ($child["invalid_reason"] == "Synonym") {
+  foreach ($term->children() as $child) {
+    if ($child->isSynonym()) {
       $synonyms[] = glossaryLabel($child);
     }
   }
   return(array(
-    "name" => glossaryLabel($row),
-    "shortname" => (string)$row["shortname"],
-    "uri" => term2URI($row),
-    "acronym" => (isset($row["acronym"]) && $row["acronym"] != "") ? (string)$row["acronym"] : null,
-    "type" => termType(isset($row["type"]) ? $row["type"] : null),
-    "vocabulary" => ($row["cv"] != "") ? mcpVocabulary($row["cv"])["name"] : null,
-    "definition" => shortText(plainText($row["description"]), MCP_SUMMARY_LENGTH),
+    "name" => glossaryLabel($term),
+    "shortname" => (string)$term->shortname,
+    "uri" => $term->uri(),
+    "acronym" => ($term->acronym != "") ? (string)$term->acronym : null,
+    "type" => $term->type,
+    "vocabulary" => ($term->cv != "") ? mcpVocabulary($term->cv)["name"] : null,
+    "definition" => shortText(plainText($term->description), MCP_SUMMARY_LENGTH),
     "synonyms" => $synonyms
   ));
 }
