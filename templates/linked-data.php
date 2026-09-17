@@ -7,13 +7,14 @@ if ($page["page_type"] == "home") {
   $vocabulary = Vocabulary::site();
   $data = vocabularyJSONLD($vocabulary, $vocabulary->terms());
 } elseif ($page["page_type"] == "cv" && $page["active_page"] != "") {
-  $vocabulary = Vocabulary::find($page["active_page"]);
+  $vocabulary = Vocabulary::find($page["active_page"], $GLOBALS["ontomasticon"]["CVs"]);
   if ($vocabulary != null) {
     $data = vocabularyJSONLD($vocabulary, $vocabulary->terms());
   }
 } elseif ($page["page_type"] == "term") {
   $term = Term::findByURI(siteURL().rawurldecode($page["active_page"]));
   if ($term != null) {
+    Term::loadRelations(array($term));
     $data = termJSONLD($term);
   }
 }

@@ -250,12 +250,11 @@ function pageStructuredData() {
   }
   if (currentPageTerm() !== null) {
     $term = currentPageTerm();
-    $vocabulary = ($term->cv == null) ? Vocabulary::site() : Vocabulary::find($term->cv);
+    $vocabulary = ($term->cv == null) ? Vocabulary::site() : Vocabulary::find($term->cv, $GLOBALS["ontomasticon"]["CVs"]);
     return(schemaOrgTermJSONLD($term, ($vocabulary === null) ? $term->vocabulary() : $vocabulary));
   }
   if (currentPageVocabulary() !== null) {
-    $vocabulary = Vocabulary::find(currentPageVocabulary()["shortname"]);
-    return(($vocabulary === null) ? null : schemaOrgTermSetJSONLD($vocabulary, currentPageTerms()));
+    return(schemaOrgTermSetJSONLD(Vocabulary::fromRow(currentPageVocabulary()), currentPageTerms()));
   }
   return(null);
 }

@@ -80,7 +80,6 @@ if (isset($_SESSION["user"]) && !empty($_SESSION["must_change_password"])) {
 
 rememberLanguage();
 $GLOBALS["ontomasticon"]["language"] = detectLanguage();
-$GLOBALS["ontomasticon"]["cv_count"] = CVcount($db);
 $GLOBALS["ontomasticon"]["CVs"] = getCVs($db);
 
 // The API and linked data are public, so scripts on other websites may read them, for example to show a term's

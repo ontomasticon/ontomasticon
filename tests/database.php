@@ -269,6 +269,12 @@ checkSame("their narrower terms", array("animal_sound"), $shortnames($siteTerms[
 checkSame("their child terms", array("bird_song"), $shortnames($siteTerms["sound"]->children()));
 checkSame("and their parent terms", "sound", $siteTerms["bird_song"]->parent()->shortname);
 checkSame("a term without a broader term has none", null, $siteTerms["sound"]->broader());
+dbQuery("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `invalid_reason`, `parent`, `broader`) VALUES ('noise', 'Noise', 'en', 0, 'Synonym', ?, ?);", array($sound->id, $sound->id));
+$loaded = array(Term::find("sound"));
+Term::loadRelations($loaded);
+checkSame("a synonym with a broader term is loaded as a child of that term, but not as one of its narrower terms", array(array("bird_song", "noise"), array("animal_sound")),
+  array($shortnames($loaded[0]->children()), $shortnames($loaded[0]->narrower())));
+dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` = 'noise';");
 
 section("Editing terms");
 $GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "admin", "active_page" => "term", "active_subpage" => "edit", "active_subsubpage" => "bird_song");
@@ -398,6 +404,9 @@ capture(function() { return(addTerm()); });
 checkSame("lists the vocabulary's terms", array("robin"), array_column(validTerms((new Vocabulary("birds"))->terms()), "shortname"));
 $birds = Vocabulary::find("birds");
 checkSame("Vocabulary::find() loads a vocabulary", "Birds", ($birds != null) ? $birds->name : null);
+$loadedBirds = array("birds" => array("shortname" => "birds", "name" => "Loaded birds", "description" => "", "reference" => ""));
+checkSame("or takes it from the vocabularies already loaded, without asking the database", "Loaded birds", Vocabulary::find("birds", $loadedBirds)->name);
+checkSame("but still asks the database for a shortname written differently", "Birds", Vocabulary::find("BIRDS", $loadedBirds)->name);
 $birdTerms = ($birds != null) ? $birds->terms() : array();
 checkSame("with its terms", array("robin"), $shortnames($birdTerms));
 checkSame("and their child terms, even outside the vocabulary", array("wren_song"), (count($birdTerms) > 0) ? $shortnames($birdTerms[0]->children()) : null);

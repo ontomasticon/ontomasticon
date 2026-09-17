@@ -4,17 +4,6 @@
 //
 // Code to handle Controlled Vocabularies (CVs)
 
-function CVcount() {
-  global $db;
-  $result = $db->query("SELECT COUNT(*) AS `count` FROM ".table("cv").";");
-  if (!$result) {
-    return(0);
-  }
-  $row = $result->fetch_assoc();
-  $result->close();
-  return($row["count"]);
-}
-
 function getCVs() {
   global $db;
   $ret = array();

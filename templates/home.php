@@ -7,9 +7,8 @@ if (searchPage()) {
 ?>
 <div id="description"><?php print tu("description"); ?></div>
 <?php
-global $db;
-if ($GLOBALS["ontomasticon"]["cv_count"] > 0) {
-  printCVs(getCVs($db));
+if (count($GLOBALS["ontomasticon"]["CVs"]) > 0) {
+  printCVs($GLOBALS["ontomasticon"]["CVs"]);
 }
 $GLOBALS["ontomasticon"]["terms"] = validTerms(currentPageTerms());
 template("term-list.php");
