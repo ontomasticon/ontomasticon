@@ -15,8 +15,11 @@ define("MCP_BODY_LIMIT", 65536);
 define("MCP_SEARCH_LIMIT", 50);
 define("MCP_TERMS_PAGE", 50);
 
-//The most characters of a definition given where a tool lists several terms
+//The most characters of a definition given where a tool lists several terms, and of the site's description in the instructions
 define("MCP_SUMMARY_LENGTH", 300);
+
+//The most characters of the site's guidance for AI applications. Some clients cut long instructions short.
+define("MCP_GUIDANCE_LENGTH", 1000);
 
 //The protocol versions the server supports, newest first
 function mcpVersions() {
@@ -267,24 +270,33 @@ function mcpServerInfo() {
   return($info);
 }
 
-//What the site is and how to use its tools, which AI applications give their models
+//The instructions AI applications give their models: the site's name and shortened description, the site's guidance for AI
+//applications, if it has any, then how to use the tools and who publishes the terms under what license. The site's own words
+//come first, as some clients cut long instructions short.
 function mcpInstructions() {
   $about = plainText(configValue("site_name"));
-  $description = plainText(configValue("description"));
+  $description = shortText(plainText(configValue("description")), MCP_SUMMARY_LENGTH);
   if ($description != "") {
     $about .= (($about == "") ? "" : ": ").$description;
   }
-  $text  = ($about == "") ? "" : $about."\n\n";
-  $text .= "Use search_terms to find terms by name, acronym or synonym, or by words in their definitions, and get_term for a term's ";
-  $text .= "full definition, references and related terms. list_vocabularies and list_terms list the terms. Each term is identified ";
-  $text .= "by its URI. When you use a definition, give the term's URI and the references the term gives: [1] in a definition cites ";
-  $text .= "the first reference.";
+  $usage  = "Use search_terms to find terms by name, acronym or synonym, or by words in their definitions, and get_term for a term's ";
+  $usage .= "full definition, references and related terms. list_vocabularies and list_terms list the terms. Each term is identified ";
+  $usage .= "by its URI. When you use a definition, give the term's URI and the references the term gives: [1] in a definition cites ";
+  $usage .= "the first reference.";
   $publisher = plainText(configValue("publisher"));
   $license = configValue("license");
   if ($publisher != "" || $license != "") {
-    $text .= " The terms are published".(($publisher == "") ? "" : " by ".$publisher).(($license == "") ? "" : " under the license at ".$license).".";
+    $usage .= " The terms are published".(($publisher == "") ? "" : " by ".$publisher).(($license == "") ? "" : " under the license at ".$license).".";
   }
-  return($text);
+  return(implode("\n\n", array_filter(array($about, trim(configValue("mcp_guidance")), $usage), "strlen")));
+}
+
+//The error explaining why guidance for AI applications can't be saved, or NULL if it can. It is plain text, and line breaks are kept.
+function mcpGuidanceError($guidance) {
+  if (preg_match('/^.{0,'.MCP_GUIDANCE_LENGTH.'}$/usD', validUTF8($guidance)) === 1) {
+    return(null);
+  }
+  return(t("Not saved. The guidance for AI applications can be at most 1,000 characters long."));
 }
 
 //The tools the server has, always in this order. None of them change anything.

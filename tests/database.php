@@ -515,6 +515,16 @@ check("saves glossary display when its box is ticked", $ok && getConfig()["gloss
 unset($_POST["glossary_display"]);
 list($out, $ok) = capture(function() { return(saveConfig()); });
 check("and turns it off when it isn't", $ok && getConfig()["glossary_display"] === "");
+$_POST["mcp_guidance"] = " Quote definitions exactly.\r\nSay when a term isn't in the glossary. ";
+list($out, $ok) = capture(function() { return(saveConfig()); });
+checkSame("saves guidance for AI applications without spaces around it, with its lines separated by new lines",
+  "Quote definitions exactly.\nSay when a term isn't in the glossary.", $ok ? getConfig()["mcp_guidance"] : null);
+$_POST["mcp_guidance"] = str_repeat("x", 1001);
+list($out, $ok) = capture(function() { return(saveConfig()); });
+check("refuses guidance longer than 1,000 characters, saving nothing", !$ok && strpos($out, "at most 1,000 characters") !== FALSE
+  && getConfig()["mcp_guidance"] == "Quote definitions exactly.\nSay when a term isn't in the glossary.");
+$_POST["mcp_guidance"] = "";
+capture(function() { return(saveConfig()); });
 
 section("Readiness report");
 $issues = array();

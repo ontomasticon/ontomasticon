@@ -62,6 +62,9 @@ if (!userAllow("administer")) {
     ?>
     <input type="checkbox" id="mcp_server" name="mcp_server" value="1" <?php print bool2check(configValue("mcp_server")); ?>>
     <br/><br/>
+    <label for="mcp_guidance"><?php print t("Guidance for AI applications"); ?></label><br/>
+    <small><?php print t("Notes for the AI models that use the MCP server, such as how to quote and cite the terms, or what to do when a term isn't in the site. They are given to AI applications when they connect, after the site's name and description. Plain text, of at most 1,000 characters."); ?></small><br/>
+    <textarea id="mcp_guidance" name="mcp_guidance" rows="4" cols="50" maxlength="<?php print MCP_GUIDANCE_LENGTH; ?>"><?php print h(configValue("mcp_guidance"));?></textarea><br/><br/>
     <button type="submit" name="submit"><?php print t("Save"); ?></button>
   </form>
 <?php

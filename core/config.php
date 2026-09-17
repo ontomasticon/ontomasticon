@@ -6,7 +6,7 @@
 
 //Settings administrators can change on the configuration page
 function editableConfigKeys() {
-  return(array("site_name", "author", "publisher", "default_lang", "languages", "base_url", "description", "glossary_display", "license", "prefix", "mcp_server"));
+  return(array("site_name", "author", "publisher", "default_lang", "languages", "base_url", "description", "glossary_display", "license", "prefix", "mcp_server", "mcp_guidance"));
 }
 
 //A configuration setting, or an empty string if it isn't set (for example before the database update that adds it)
@@ -40,6 +40,12 @@ function saveConfig() {
   }
   if (prefixError($vals["prefix"]) !== null) {
     printError(prefixError($vals["prefix"]));
+    return(FALSE);
+  }
+  //Browsers send the lines of a text box separated by \r\n, which are saved as new lines
+  $vals["mcp_guidance"] = str_replace(array("\r\n", "\r"), "\n", $vals["mcp_guidance"]);
+  if (mcpGuidanceError($vals["mcp_guidance"]) !== null) {
+    printError(mcpGuidanceError($vals["mcp_guidance"]));
     return(FALSE);
   }
   $languages = preg_split('/[\s,]+/', $vals["languages"], -1, PREG_SPLIT_NO_EMPTY);

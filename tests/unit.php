@@ -940,6 +940,17 @@ if (!function_exists("json_encode")) {
   $GLOBALS["ontomasticon"]["config"]["license"] = "https://creativecommons.org/licenses/by/4.0/";
   check("and the license, when the site has one", strpos(mcpInstructions(), "published under the license at https://creativecommons.org/licenses/by/4.0/.") !== FALSE);
   unset($GLOBALS["ontomasticon"]["config"]["license"]);
+  $GLOBALS["ontomasticon"]["config"]["mcp_guidance"] = "Quote definitions exactly.\nSay when a term isn't in the glossary.";
+  check("the site's guidance for AI applications comes straight after its name and description, keeping its line breaks",
+    strpos(mcpInstructions(), "Bioacoustics Glossary: Terms used in bioacoustics.\n\nQuote definitions exactly.\nSay when a term isn't in the glossary.\n\nUse search_terms") === 0);
+  unset($GLOBALS["ontomasticon"]["config"]["mcp_guidance"]);
+  $description = $GLOBALS["ontomasticon"]["config"]["description"];
+  $GLOBALS["ontomasticon"]["config"]["description"] = str_repeat("A long description. ", 40);
+  check("a long description is shortened in the instructions, so the site's guidance isn't cut off",
+    strpos(mcpInstructions(), "…\n\nUse search_terms") !== FALSE && strlen(strstr(mcpInstructions(), "\n\n", TRUE)) < 330);
+  $GLOBALS["ontomasticon"]["config"]["description"] = $description;
+  checkSame("guidance can be 1,000 characters long, counted as characters rather than bytes, but no longer", array(null, TRUE),
+    array(mcpGuidanceError(str_repeat("é", 1000)), mcpGuidanceError(str_repeat("é", 1001)) !== null));
   list(, , $response) = testMCPResponse(testMCPMessage("server/discover", array(), "discover-1"), testMCPHeaders("server/discover"));
   checkSame("a response has its request's id", "discover-1", valueAt($response, array("id")));
 

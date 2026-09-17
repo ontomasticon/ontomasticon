@@ -395,7 +395,13 @@ checkSame("a request that isn't JSON is refused", array(400, -32700), array($sta
 list(, , $body) = httpRequest("GET", "/api/");
 check("the API page gives the server's address and its tools", strpos($body, "<code>https://glossary.example.org/api/mcp</code>") !== FALSE
   && strpos($body, "<h4>search_terms</h4>") !== FALSE);
-$db->query("DELETE FROM ".table("config")." WHERE `key` = 'mcp_server';");
+$db->query("INSERT INTO ".table("config")." (`key`, `value`) VALUES ('mcp_guidance', 'Quote <definitions> exactly.\nCite their references.');");
+list(, , $response) = httpMCPRequest("server/discover");
+check("the site's guidance for AI applications is in the server's instructions", strpos((string)valueAt($response, array("result", "instructions")),
+  "\n\nQuote <definitions> exactly.\nCite their references.\n\nUse search_terms") !== FALSE);
+list(, , $body) = httpRequest("GET", "/api/");
+check("and the API page shows the instructions, escaped, with their line breaks", strpos($body, "Quote &lt;definitions&gt; exactly.<br />\nCite their references.") !== FALSE);
+$db->query("DELETE FROM ".table("config")." WHERE `key` IN ('mcp_server', 'mcp_guidance');");
 list(, , $body) = httpRequest("GET", "/api/");
 check("but not once it is off", strpos($body, "api/mcp") === FALSE);
 
@@ -532,6 +538,8 @@ check("the configuration form has the publishing settings",
 check("and the glossary display checkbox", strpos($body, '<input type="checkbox" id="glossary_display" name="glossary_display" value="1" >') !== FALSE);
 check("and the MCP server checkbox, with the server's address", strpos($body, '<input type="checkbox" id="mcp_server" name="mcp_server" value="1" >') !== FALSE
   && strpos($body, "https://glossary.example.org/api/mcp") !== FALSE);
+check("and a box for guidance for AI applications, of at most 1,000 characters",
+  strpos($body, '<textarea id="mcp_guidance" name="mcp_guidance" rows="4" cols="50" maxlength="1000">') !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/config", array(
   "csrf_token" => $token, "site_name" => "Test glossary", "author" => "Tester", "publisher" => "Test publisher",
   "default_lang" => "en", "base_url" => "glossary.example.org/", "description" => "Testing",
