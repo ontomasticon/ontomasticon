@@ -52,12 +52,17 @@ function getTerms($cv=null) {
 //The most characters of a search that are used
 define("SEARCH_QUERY_LENGTH", 100);
 
-//The text searched for with ?q=, without spaces around it and cut to SEARCH_QUERY_LENGTH characters, or "" if there is none
+//The text searched for with ?q= (see searchText()), or "" if there is none
 function searchQuery() {
   if (!isset($_GET["q"]) || !is_string($_GET["q"])) {
     return("");
   }
-  preg_match('/^.{0,'.SEARCH_QUERY_LENGTH.'}/us', validUTF8(trim($_GET["q"])), $matches);
+  return(searchText($_GET["q"]));
+}
+
+//Text to search for, without spaces around it and cut to SEARCH_QUERY_LENGTH characters
+function searchText($text) {
+  preg_match('/^.{0,'.SEARCH_QUERY_LENGTH.'}/us', validUTF8(trim($text)), $matches);
   return(trim($matches[0]));
 }
 
@@ -123,8 +128,8 @@ function termSuggestions($query, $limit = 10) {
 
 //Valid terms for the page of results of a search, with their related terms (see withTermRelations()): those whose name,
 //short name, acronym or definition contains $query, or that have a synonym whose name, short name or acronym does. Terms
-//whose name starts with it come first, then in order of name.
-function searchTerms($query) {
+//whose name starts with it come first, then in order of name. At most $limit terms are given, or all of them if it is NULL.
+function searchTerms($query, $limit = null) {
   if ($query === "") {
     return(array());
   }
@@ -132,7 +137,7 @@ function searchTerms($query) {
   $sql  = "SELECT * FROM ".table("terms")." WHERE `invalid_reason` IS NULL ";
   $sql .= "AND (`name` LIKE ? ESCAPE '|' OR `shortname` LIKE ? ESCAPE '|' OR `acronym` LIKE ? ESCAPE '|' OR `description` LIKE ? ESCAPE '|' ";
   $sql .= "OR `id` IN (SELECT `parent` FROM ".table("terms")." WHERE `invalid_reason` = 'Synonym' AND (`name` LIKE ? ESCAPE '|' OR `shortname` LIKE ? ESCAPE '|' OR `acronym` LIKE ? ESCAPE '|'))) ";
-  $sql .= "ORDER BY `name` LIKE ? ESCAPE '|' DESC, `name`, `shortname`;";
+  $sql .= "ORDER BY `name` LIKE ? ESCAPE '|' DESC, `name`, `shortname`".(($limit === null) ? "" : " LIMIT ".(int)$limit).";";
   $result = dbQuery($sql, array($contains, $contains, $contains, $contains, $contains, $contains, $contains, likePattern($query, TRUE)));
   $rows = ($result) ? $result->fetch_all(MYSQLI_ASSOC) : array();
   return(withTermRelations($rows));

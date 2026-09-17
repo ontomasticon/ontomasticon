@@ -73,7 +73,11 @@ define("PUBLIC_CACHE_SECONDS", 300);
 //Whether a request needs a session: when the visitor already has one (for example because they are logged in),
 //submits a form, visits the login, user or administration pages, or chooses one of the site's languages, which is
 //remembered for the rest of the visit. Other visitors, including crawlers, get no session cookie, and pages they can cache.
+//The MCP server never needs one, although requests to it are posted, as it has no forms or logins.
 function sessionNeeded($pageInfo) {
+  if (mcpPage($pageInfo)) {
+    return(FALSE);
+  }
   if (isset($_COOKIE[session_name()])) {
     return(TRUE);
   }

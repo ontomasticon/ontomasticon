@@ -53,6 +53,15 @@ if (!userAllow("administer")) {
     <input type="text" id="prefix" name="prefix"
            value="<?php print h(configValue("prefix"));?>"
            placeholder=""><br/><br/>
+    <label for="mcp_server"><?php print t("MCP server"); ?></label><br/>
+    <small><?php print t("Let AI applications that support the Model Context Protocol (MCP), such as Claude, search the site's terms and read their definitions, references and related terms. They can't change anything. The server's address:"); ?> <?php print h(mcpURL()); ?></small><br/>
+    <?php
+    if (!function_exists("json_decode")) {
+      print "<small>".t("The MCP server needs PHP's JSON extension, which this server doesn't have.")."</small><br/>";
+    }
+    ?>
+    <input type="checkbox" id="mcp_server" name="mcp_server" value="1" <?php print bool2check(configValue("mcp_server")); ?>>
+    <br/><br/>
     <button type="submit" name="submit"><?php print t("Save"); ?></button>
   </form>
 <?php

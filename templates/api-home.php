@@ -69,4 +69,28 @@
         including browsers, get the HTML page.
     </p>
   </div>
+
+  <?php
+  if (mcpEnabled()) {
+    //The example names the server with the site's namespace prefix, which is a single word, if it has one
+    $mcpName = (configValue("prefix") != "") ? configValue("prefix") : "ontomasticon";
+    ?>
+    <div class="feature">
+      <h3>MCP server</h3>
+      <p>
+          AI applications that support the Model Context Protocol (MCP), such as Claude, can search the site's terms
+          and read them through its MCP server, at <code><?php print h(mcpURL()); ?></code>. For example, to add it to
+          Claude Code: <code>claude mcp add --transport http <?php print h($mcpName." ".mcpURL()); ?></code>
+      </p>
+      <p>The server has these tools, none of which change anything:</p>
+      <?php
+      foreach (mcpTools() as $tool) {
+        print "<h4>".h($tool["name"])."</h4>\n";
+        print "<p>".h($tool["description"])."</p>\n";
+      }
+      ?>
+    </div>
+    <?php
+  }
+  ?>
 </div>

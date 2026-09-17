@@ -53,15 +53,17 @@ if (!$ready) {
   return;
 }
 
-//Send a request to the test server, with any extra headers, keeping the session cookie between requests.
-//Returns array(status, response headers, body). PHP errors in the page count as failures.
+//Send a request to the test server, with any extra headers, keeping the session cookie between requests. $fields are form
+//fields, or text to send as it is. Returns array(status, response headers, body). PHP errors in the page count as failures.
 function httpRequest($method, $path, $fields = null, $extraHeaders = array()) {
   $headers = $extraHeaders;
   if (isset($GLOBALS["http_cookie"])) {
     $headers[] = "Cookie: ".$GLOBALS["http_cookie"];
   }
   $options = array("method" => $method, "ignore_errors" => TRUE, "follow_location" => 0, "timeout" => 10);
-  if ($fields !== null) {
+  if (is_string($fields)) {
+    $options["content"] = $fields;
+  } elseif ($fields !== null) {
     $headers[] = "Content-Type: application/x-www-form-urlencoded";
     $options["content"] = http_build_query($fields);
   }
@@ -349,6 +351,54 @@ list(, , $body) = httpRequest("GET", "/?q=".rawurlencode("<b>x"));
 check("says when nothing matches, and escapes the search", strpos($body, "No terms match your search.") !== FALSE
   && strpos($body, "“&lt;b&gt;x”") !== FALSE && strpos($body, "<b>x") === FALSE);
 
+section("HTTP: MCP server");
+unset($GLOBALS["http_cookie"]);
+//Post a request of protocol version 2026-07-28 to the MCP server, with the headers that go with it.
+//Returns array(status, response headers, the body decoded).
+function httpMCPRequest($method, $params = array()) {
+  $params["_meta"] = array("io.modelcontextprotocol/protocolVersion" => "2026-07-28", "io.modelcontextprotocol/clientCapabilities" => new stdClass());
+  $headers = array("Content-Type: application/json", "Accept: application/json, text/event-stream", "MCP-Protocol-Version: 2026-07-28", "Mcp-Method: ".$method);
+  if (isset($params["name"])) {
+    $headers[] = "Mcp-Name: ".$params["name"];
+  }
+  list($status, $responseHeaders, $body) = httpRequest("POST", "/api/mcp", toJSON(array("jsonrpc" => "2.0", "id" => 1, "method" => $method, "params" => $params)), $headers);
+  return(array($status, $responseHeaders, json_decode($body, TRUE)));
+}
+list($status, , $body) = httpRequest("POST", "/api/mcp", "{}", array("Content-Type: application/json"));
+check("the MCP server isn't there until the site turns it on, and says nothing", $status == 404 && $body === "");
+list($status, , $body) = httpRequest("GET", "/api/nothing");
+check("nor is an address in the API that doesn't exist", $status == 404 && $body === "");
+$db->query("INSERT INTO ".table("config")." (`key`, `value`) VALUES ('mcp_server', '1');");
+list($status, $headers, $response) = httpMCPRequest("server/discover");
+check("once it is on, it answers with JSON", $status == 200 && hasHeader($headers, '#^Content-Type: application/json#i')
+  && in_array("2026-07-28", (array)valueAt($response, array("result", "supportedVersions")), TRUE));
+check("which scripts on other websites may read", hasHeader($headers, '/^Access-Control-Allow-Origin: \*$/i'));
+check("without starting a session, although requests are posted", !hasHeader($headers, '/^Set-Cookie:/i') && !hasHeader($headers, '/no-store/i'));
+list($status, , $response) = httpMCPRequest("tools/call", array("name" => "search_terms", "arguments" => array("query" => "song")));
+checkSame("its tools search the site's terms", array("agreement_song", "calling_song"),
+  array_column((array)valueAt($response, array("result", "structuredContent", "terms")), "shortname"));
+list(, $headers, $body) = httpRequest("POST", "/api/mcp", toJSON(array("jsonrpc" => "2.0", "id" => 1, "method" => "initialize", "params" => array(
+  "protocolVersion" => "2025-11-25", "capabilities" => new stdClass(), "clientInfo" => array("name" => "Test", "version" => "1")
+))), array("Content-Type: application/json", "Accept: application/json, text/event-stream"));
+checkSame("clients of earlier versions can initialize", "2025-11-25", valueAt(json_decode($body, TRUE), array("result", "protocolVersion")));
+check("without being given a session", !hasHeader($headers, '/^Mcp-Session-Id:/i') && !hasHeader($headers, '/^Set-Cookie:/i'));
+list($status, , $body) = httpRequest("POST", "/api/mcp", toJSON(array("jsonrpc" => "2.0", "method" => "notifications/initialized")),
+  array("Content-Type: application/json", "MCP-Protocol-Version: 2025-11-25"));
+check("and their notifications are accepted, with no reply", $status == 202 && $body === "");
+list($status, $headers) = httpRequest("GET", "/api/mcp");
+check("GET isn't allowed", $status == 405 && hasHeader($headers, '/^Allow: POST, OPTIONS$/i'));
+list($status, $headers) = httpRequest("OPTIONS", "/api/mcp", null, array("Origin: https://example.org", "Access-Control-Request-Method: POST"));
+check("browsers may let scripts on other websites post requests with MCP's headers", $status == 204
+  && hasHeader($headers, '/^Access-Control-Allow-Headers: .*Mcp-Method/i') && hasHeader($headers, '/^Access-Control-Allow-Origin: \*$/i'));
+list($status, , $body) = httpRequest("POST", "/api/mcp", "{not json", array("Content-Type: application/json"));
+checkSame("a request that isn't JSON is refused", array(400, -32700), array($status, valueAt(json_decode($body, TRUE), array("error", "code"))));
+list(, , $body) = httpRequest("GET", "/api/");
+check("the API page gives the server's address and its tools", strpos($body, "<code>https://glossary.example.org/api/mcp</code>") !== FALSE
+  && strpos($body, "<h4>search_terms</h4>") !== FALSE);
+$db->query("DELETE FROM ".table("config")." WHERE `key` = 'mcp_server';");
+list(, , $body) = httpRequest("GET", "/api/");
+check("but not once it is off", strpos($body, "api/mcp") === FALSE);
+
 section("HTTP: schema.org");
 //The schema.org data embedded in a page, decoded, or NULL if there is none
 function structuredData($body) {
@@ -480,6 +530,8 @@ check("while logged in, public pages aren't kept, so edits show at once",
 check("the configuration form has the publishing settings",
   strpos($body, 'name="publisher"') !== FALSE && strpos($body, 'name="license"') !== FALSE && strpos($body, 'name="prefix"') !== FALSE);
 check("and the glossary display checkbox", strpos($body, '<input type="checkbox" id="glossary_display" name="glossary_display" value="1" >') !== FALSE);
+check("and the MCP server checkbox, with the server's address", strpos($body, '<input type="checkbox" id="mcp_server" name="mcp_server" value="1" >') !== FALSE
+  && strpos($body, "https://glossary.example.org/api/mcp") !== FALSE);
 list(, , $body) = httpRequest("POST", "/admin/config", array(
   "csrf_token" => $token, "site_name" => "Test glossary", "author" => "Tester", "publisher" => "Test publisher",
   "default_lang" => "en", "base_url" => "glossary.example.org/", "description" => "Testing",
