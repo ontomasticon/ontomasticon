@@ -89,6 +89,8 @@
         print "<p>".h($tool["description"])."</p>\n";
       }
       ?>
+      <p>The server gives AI applications these instructions for their models:</p>
+      <blockquote class="mcp-instructions"><p><?php print nl2br(h(mcpInstructions())); ?></p></blockquote>
     </div>
     <?php
   }
