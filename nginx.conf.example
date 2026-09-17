@@ -17,6 +17,13 @@ server {
     root /var/www/ontomasticon;
     index index.php;
 
+    # Compress the text the site sends, including the JSON, JSON-LD and Turtle of the API, the linked data and
+    # the MCP server. nginx only compresses HTML unless gzip_types lists other types, and a gzip_types here
+    # takes the place of any in the http block, so every type is listed.
+    gzip on;
+    gzip_types text/plain text/css text/javascript application/javascript application/xml image/svg+xml
+               application/json application/ld+json text/turtle;
+
     # Code, templates, language files and tests are only used through index.php
     location ~ ^/(core|templates|lang|tests)/ {
         return 403;
