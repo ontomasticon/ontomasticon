@@ -11,5 +11,5 @@ global $db;
 if ($GLOBALS["ontomasticon"]["cv_count"] > 0) {
   printCVs(getCVs($db));
 }
-$GLOBALS["ontomasticon"]["terms"] = getTerms();
+$GLOBALS["ontomasticon"]["terms"] = validTerms(currentPageTerms());
 template("term-list.php");

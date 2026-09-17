@@ -19,7 +19,7 @@ if ($format !== null) {
 
 header('Content-Type: application/json; charset=utf-8');
 if ($term != null) {
-  $term["url"] = term2URI($term);
+  $term["url"] = Term::fromRow($term)->uri();
   //Values are returned as strings, as they were before the database code used prepared statements
   foreach ($term as $key => $value) {
     if ($value !== null) {

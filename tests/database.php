@@ -188,18 +188,18 @@ checkSame("quotes in values can't change a query", null, getTerm("x' OR '1'='1")
 
 section("Listing terms");
 $terms = array();
-foreach (getTerms() as $term) {
-  $terms[$term["shortname"]] = $term;
+foreach (validTerms(Vocabulary::site()->terms()) as $term) {
+  $terms[$term->shortname] = $term;
 }
 $names = array_keys($terms);
 sort($names);
 checkSame("lists the terms outside vocabularies", array("animal_sound", "bird_song", "sound"), $names);
-checkSame("includes child terms", array("bird_song"), array_column($terms["sound"]["children"], "shortname"));
-checkSame("includes narrower terms", array("animal_sound"), array_column($terms["sound"]["narrower"], "shortname"));
-checkSame("includes the broader term", array("sound"), array_column($terms["animal_sound"]["broader"], "shortname"));
-checkSame("terms without children have none", array(), $terms["bird_song"]["children"]);
-checkSame("includes the parent term", array("sound"), array_column($terms["bird_song"]["parent_term"], "shortname"));
-checkSame("terms without a parent have none", array(), $terms["sound"]["parent_term"]);
+checkSame("includes child terms", array("bird_song"), array_column($terms["sound"]->children(), "shortname"));
+checkSame("includes narrower terms", array("animal_sound"), array_column($terms["sound"]->narrower(), "shortname"));
+checkSame("includes the broader term", "sound", $terms["animal_sound"]->broader()->shortname);
+checkSame("terms without children have none", array(), $terms["bird_song"]->children());
+checkSame("includes the parent term", "sound", $terms["bird_song"]->parent()->shortname);
+checkSame("terms without a parent have none", null, $terms["sound"]->parent());
 $term = getTerm("animal_sound");
 checkSame("getTerm() gives the broader term's short name", "sound", $term["broader"]);
 checkSame("getTermByID() finds the same term", "animal_sound", getTermByID($term["id"])["shortname"]);
@@ -229,9 +229,10 @@ checkSame("nothing is suggested for an empty search", array(), termSuggestions("
 checkSame("the results page lists valid terms whose definition contains the search", array("stridulation", "wing_stridulation"),
   array_column(searchTerms("rubbing"), "shortname"));
 checkSame("and terms with a synonym that matches", array("stridulation"), array_column(searchTerms("stridulatory"), "shortname"));
-check("with their related terms", isset(searchTerms("wing")[0]["narrower"]));
-checkSame("a synonym's page has the term it is a synonym of", array("stridulation"),
-  array_column(getTermForPage(termRow("stridulatory_sound")["id"])["parent_term"], "shortname"));
+checkSame("with their related terms", array("stridulatory_sound"), array_column(searchTerms("stridulatory")[0]->children(), "shortname"));
+$synonymPage = Term::find("stridulatory_sound");
+Term::loadRelations(array($synonymPage));
+checkSame("a synonym's page has the term it is a synonym of", "stridulation", $synonymPage->parent()->shortname);
 dbQuery("DELETE FROM ".table("terms")." WHERE `shortname` IN ('stridulatory_sound', 'stridulation', 'wing_stridulation', 'full_duty_cycle', 'passive_acoustic_monitoring');");
 
 section("Term objects");
@@ -326,11 +327,11 @@ checkSame("saves a term's related terms, each once", array("animal_sound", "soun
 checkSame("and relates each of them to the term", array(array("bird_song"), array("bird_song")),
   array(relatedTermShortnames(termRow("animal_sound")["id"]), relatedTermShortnames(termRow("sound")["id"])));
 $terms = array();
-foreach (getTerms() as $term) {
-  $terms[$term["shortname"]] = $term;
+foreach (validTerms(Vocabulary::site()->terms()) as $term) {
+  $terms[$term->shortname] = $term;
 }
 checkSame("lists each term's related terms", array(array("animal_sound", "sound"), array("bird_song")),
-  array(array_column($terms["bird_song"]["related"], "shortname"), array_column($terms["animal_sound"]["related"], "shortname")));
+  array(array_column($terms["bird_song"]->related(), "shortname"), array_column($terms["animal_sound"]->related(), "shortname")));
 checkSame("Term objects load them", array("animal_sound", "sound"), $shortnames(Term::find("bird_song")->related()));
 $siteTerms = array();
 foreach (Vocabulary::site()->terms() as $term) {
@@ -394,7 +395,7 @@ termForm(array("shortname" => "robin", "name" => "Robin", "cv" => "birds"));
 capture(function() { return(addTerm()); });
 termForm(array("shortname" => "wren_song", "name" => "Wren song", "parent" => "robin"));
 capture(function() { return(addTerm()); });
-checkSame("lists the vocabulary's terms", array("robin"), array_column(getTerms("birds"), "shortname"));
+checkSame("lists the vocabulary's terms", array("robin"), array_column(validTerms((new Vocabulary("birds"))->terms()), "shortname"));
 $birds = Vocabulary::find("birds");
 checkSame("Vocabulary::find() loads a vocabulary", "Birds", ($birds != null) ? $birds->name : null);
 $birdTerms = ($birds != null) ? $birds->terms() : array();

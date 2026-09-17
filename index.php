@@ -104,7 +104,17 @@ if (in_array($GLOBALS["ontomasticon"]["pageInfo"]["page_type"], array("home", "c
 // is not found, though its page still shows the site's terms or vocabularies, as an old link may be meant for one.
 if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "term") {
   $pageTerm = Term::findByURI(siteURL().rawurldecode($GLOBALS["ontomasticon"]["pageInfo"]["active_page"]));
-  $GLOBALS["ontomasticon"]["pageTerm"] = ($pageTerm == null) ? null : getTermForPage($pageTerm->id);
+  if ($pageTerm !== null) {
+    Term::loadRelations(array($pageTerm));
+  }
+  $GLOBALS["ontomasticon"]["pageTerm"] = $pageTerm;
+}
+// The home page and a vocabulary's page list their terms and describe them in the page's head, so they are loaded once, here.
+// The page for an address that should be a term's, but isn't, lists the site's terms too.
+if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "home" || ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "term" && currentPageTerm() === null)) {
+  $GLOBALS["ontomasticon"]["pageTerms"] = Vocabulary::site()->terms();
+} elseif (currentPageVocabulary() !== null) {
+  $GLOBALS["ontomasticon"]["pageTerms"] = (new Vocabulary(currentPageVocabulary()["shortname"]))->terms();
 }
 if (pageNotFound()) {
   http_response_code(404);

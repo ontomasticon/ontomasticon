@@ -2,7 +2,7 @@
 // Ontomasticon: a simple, lightweight, PHP-based ontology browser.
 // Department of Information Retrieval
 //
-// Terms and vocabularies as objects, for output formats that follow the links between terms
+// Terms and vocabularies as objects, for the site's pages and the other formats that follow the links between terms
 
 class Term {
   public $id;
@@ -49,6 +49,18 @@ class Term {
     return($term);
   }
 
+  //The terms in the rows of a query on the terms table, such as a search, or none if the query failed
+  public static function fromResult($result) {
+    $terms = array();
+    if ($result) {
+      foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
+        $terms[] = Term::fromRow($row);
+      }
+      $result->close();
+    }
+    return($terms);
+  }
+
   //The term with a shortname, or NULL if there is no match
   public static function find($shortname) {
     return(Term::loadOne("`shortname` = ?", array($shortname)));
@@ -57,6 +69,11 @@ class Term {
   //The term with an id, or NULL if there is no match
   public static function findByID($id) {
     return(Term::loadOne("`id` = ?", array($id)));
+  }
+
+  //The terms with the ids in a list, in order of short name
+  public static function findByIDs($ids) {
+    return(Term::loadIn("`id`", $ids));
   }
 
   //Every term, in and outside vocabularies, including deprecated ones
@@ -146,15 +163,7 @@ class Term {
 
   //Terms matching a condition on the terms table, with ? placeholders filled from $params
   private static function loadAll($where, $params) {
-    $terms = array();
-    $result = dbQuery("SELECT * FROM ".table("terms")." WHERE ".$where." ORDER BY `shortname`;", $params);
-    if ($result) {
-      foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
-        $terms[] = Term::fromRow($row);
-      }
-      $result->close();
-    }
-    return($terms);
+    return(Term::fromResult(dbQuery("SELECT * FROM ".table("terms")." WHERE ".$where." ORDER BY `shortname`;", $params)));
   }
 
   private static function loadOne($where, $params) {
