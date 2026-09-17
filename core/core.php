@@ -18,3 +18,4 @@ require("core/rdf.php");
 require("core/schemaorg.php");
 require("core/readiness.php");
 require("core/language.php");
+require("core/mcp.php");

@@ -525,6 +525,123 @@ checkSame("reports that the site has no license", array("Site configuration"), i
 checkSame("and the terms without a definition", array("animal_sound", "bird_song", "wren_song"), isset($issues["definition"]) ? $issues["definition"] : null);
 check("but not the site's namespace prefix, which is set", !isset($issues["prefix"]));
 
+section("MCP tools");
+//The data a tool gives, as clients read it. Problems with it, such as not matching the tool's output schema, are kept in
+//$GLOBALS["mcp_tool_problems"], and a result that is an error gives NULL.
+function testMCPTool($name, $arguments = array()) {
+  $result = mcpCallTool($name, $arguments);
+  if ($result === null || $result["isError"]) {
+    $GLOBALS["mcp_tool_problems"][] = $name." gave an error: ".(($result === null) ? "there is no such tool" : $result["content"][0]["text"]);
+    return(null);
+  }
+  $data = json_decode(toJSON($result["structuredContent"]), TRUE);
+  $schemas = array_column(mcpTools(), "outputSchema", "name");
+  foreach (schemaProblems($data, $schemas[$name]) as $problem) {
+    $GLOBALS["mcp_tool_problems"][] = $name." doesn't match its output schema: ".$problem;
+  }
+  if (json_decode($result["content"][0]["text"], TRUE) !== $data) {
+    $GLOBALS["mcp_tool_problems"][] = $name." doesn't give the same data as text";
+  }
+  return($data);
+}
+$GLOBALS["mcp_tool_problems"] = array();
+dbQuery("INSERT INTO ".table("cv")." (`shortname`, `name`, `description`, `reference`) VALUES ('call_types', 'Call types', '<p>Types of <b>call</b>.</p>', '');");
+$GLOBALS["ontomasticon"]["CVs"] = getCVs();
+termForm(array("shortname" => "stridulation", "name" => "Stridulation", "acronym" => "STR", "description" => "<p>“Rubbing body parts together” [1].</p>",
+  "reference" => "Krause 2015\nhttps://doi.org/10.1000/example"));
+capture(function() { return(addTerm()); });
+termForm(array("shortname" => "stridulatory_sound", "name" => "Stridulatory sound", "invalid" => "Synonym", "parent" => "stridulation"));
+capture(function() { return(addTerm()); });
+termForm(array("shortname" => "pulse_rate", "name" => "Pulse rate", "cv" => "call_types", "type" => "property", "values" => "datatype:decimal"));
+capture(function() { return(addTerm()); });
+termForm(array("shortname" => "wing_stridulation", "name" => "Wing stridulation", "description" => "Rubbing the wings together.",
+  "broader" => "stridulation", "related" => "pulse_rate"));
+capture(function() { return(addTerm()); });
+for ($i = 1; $i <= 52; $i++) {
+  dbQuery("INSERT INTO ".table("terms")." (`shortname`, `name`, `language`, `opaque`, `cv`) VALUES (?, ?, 'en', 0, 'call_types');",
+    array(sprintf("call_%02d", $i), sprintf("Call %02d", $i)));
+}
+
+$data = testMCPTool("search_terms", array("query" => "stridul"));
+checkSame("search_terms finds terms by name, those starting with the search first, and by their synonyms' names", array("stridulation", "wing_stridulation"),
+  is_array($data) ? array_column($data["terms"], "shortname") : null);
+checkSame("giving each term's URI, acronym, definition as plain text and synonyms", array(
+  "name" => "Stridulation", "shortname" => "stridulation", "uri" => "https://glossary.example.org/stridulation", "acronym" => "STR", "type" => "concept",
+  "vocabulary" => null, "definition" => "“Rubbing body parts together” [1].", "synonyms" => array("Stridulatory sound")
+), valueAt($data, array("terms", 0)));
+checkSame("and saying there are no more", FALSE, valueAt($data, array("more")));
+$data = testMCPTool("search_terms", array("query" => "stridul", "limit" => 1));
+checkSame("it gives at most as many terms as asked for, saying when there are more", array(1, TRUE),
+  is_array($data) ? array(count($data["terms"]), $data["more"]) : null);
+$data = testMCPTool("search_terms", array("query" => "wings"));
+checkSame("and finds terms by words in their definitions", array("wing_stridulation"), is_array($data) ? array_column($data["terms"], "shortname") : null);
+
+$data = testMCPTool("get_term", array("shortname" => "stridulation"));
+checkSame("get_term gives a term's definition as plain text, and its references in order", array("“Rubbing body parts together” [1].",
+  array("Krause 2015", "https://doi.org/10.1000/example")), is_array($data) ? array($data["definition"], $data["references"]) : null);
+checkSame("its vocabulary, which for the site's own terms is the site", array("shortname" => null, "name" => configValue("site_name"), "uri" => "https://glossary.example.org/"),
+  valueAt($data, array("vocabulary")));
+checkSame("its synonyms and narrower terms", array(
+  array(array("name" => "Stridulatory sound", "uri" => "https://glossary.example.org/stridulatory_sound")),
+  array(array("name" => "Wing stridulation", "uri" => "https://glossary.example.org/wing_stridulation"))
+), is_array($data) ? array($data["synonyms"], $data["narrower"]) : null);
+check("and the date it was added", preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/D', (string)valueAt($data, array("created"))) === 1);
+$data = testMCPTool("get_term", array("uri" => "https://glossary.example.org/wing_stridulation"));
+checkSame("it finds a term by its URI, and gives its broader and related terms", array(
+  array("name" => "Stridulation", "uri" => "https://glossary.example.org/stridulation"),
+  array(array("name" => "Pulse rate", "uri" => "https://glossary.example.org/cv/call_types#pulse_rate"))
+), is_array($data) ? array($data["broader"], $data["related"]) : null);
+$data = testMCPTool("get_term", array("uri" => "https://glossary.example.org/stridulatory_sound"));
+checkSame("a synonym is deprecated, and gives the term it is a synonym of", array(TRUE, array("name" => "Stridulation", "uri" => "https://glossary.example.org/stridulation")),
+  is_array($data) ? array($data["deprecated"], $data["synonym_of"]) : null);
+$data = testMCPTool("get_term", array("uri" => "https://glossary.example.org/cv/call_types#pulse_rate"));
+checkSame("a term in a vocabulary gives the vocabulary, and a property gives where its values come from", array(
+  array("shortname" => "call_types", "name" => "Call types", "uri" => "https://glossary.example.org/cv/call_types"), "property",
+  array("datatype" => "decimal", "vocabulary" => null)
+), is_array($data) ? array($data["vocabulary"], $data["type"], $data["values"]) : null);
+checkSame("and terms are related both ways", array("Wing stridulation"), is_array($data) ? array_column($data["related"], "name") : null);
+$missing = mcpCallTool("get_term", array("uri" => "https://glossary.example.org/cv/call_types#stridulation"));
+check("a URI that isn't a term's is an error, which suggests searching", $missing["isError"] && strpos($missing["content"][0]["text"], "search_terms") !== FALSE);
+
+$data = testMCPTool("list_vocabularies");
+checkSame("list_vocabularies starts with the site's own terms", array(null, "https://glossary.example.org/"),
+  array(valueAt($data, array("vocabularies", 0, "shortname")), valueAt($data, array("vocabularies", 0, "uri"))));
+checkSame("then gives each vocabulary, with its description as plain text and how many terms it has", array(array("shortname" => "call_types",
+  "name" => "Call types", "uri" => "https://glossary.example.org/cv/call_types", "description" => "Types of call.", "terms" => 53)),
+  array_values(array_filter(is_array($data) ? $data["vocabularies"] : array(), function($vocabulary) { return($vocabulary["shortname"] === "call_types"); })));
+$data = testMCPTool("list_terms", array("vocabulary" => "call_types"));
+checkSame("list_terms gives a vocabulary's terms 50 at a time in order of name, with how many there are and where the next start", array(50, "Call 01", 53, 50),
+  is_array($data) ? array(count($data["terms"]), $data["terms"][0]["name"], $data["total"], $data["next_offset"]) : null);
+$data = testMCPTool("list_terms", array("vocabulary" => "call_types", "offset" => 50));
+checkSame("and then the rest", array(array("Call 51", "Call 52", "Pulse rate"), null),
+  is_array($data) ? array(array_column($data["terms"], "name"), $data["next_offset"]) : null);
+$listed = array();
+$offset = 0;
+while ($offset !== null) {
+  $data = testMCPTool("list_terms", array("offset" => $offset));
+  $listed = array_merge($listed, is_array($data) ? array_column($data["terms"], "shortname") : array());
+  $offset = valueAt($data, array("next_offset"));
+}
+check("without a vocabulary, it gives the site's own terms, with synonyms given with their terms rather than on their own",
+  in_array("stridulation", $listed) && !in_array("stridulatory_sound", $listed) && !in_array("pulse_rate", $listed));
+
+$GLOBALS["ontomasticon"]["config"]["mcp_server"] = "1";
+$response = mcpResponse("POST", array("mcp-protocol-version" => "2026-07-28", "mcp-method" => "tools/call", "mcp-name" => "get_term"), toJSON(array(
+  "jsonrpc" => "2.0", "id" => 1, "method" => "tools/call", "params" => array("name" => "get_term", "arguments" => array("shortname" => "pulse_rate"),
+    "_meta" => array("io.modelcontextprotocol/protocolVersion" => "2026-07-28", "io.modelcontextprotocol/clientCapabilities" => new stdClass()))
+)));
+checkSame("a tools/call request to the server gives the tool's result", "Pulse rate",
+  valueAt(json_decode((string)$response["body"], TRUE), array("result", "structuredContent", "name")));
+unset($GLOBALS["ontomasticon"]["config"]["mcp_server"]);
+checkSame("every tool's result matches its output schema, and is given as text too", array(), $GLOBALS["mcp_tool_problems"]);
+$result = dbQuery("SELECT `id` FROM ".table("terms")." WHERE `shortname` IN ('stridulation', 'stridulatory_sound', 'wing_stridulation') OR `cv` = 'call_types';");
+foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
+  dbQuery("DELETE FROM ".table("related_terms")." WHERE `term` = ? OR `related` = ?;", array($row["id"], $row["id"]));
+  dbQuery("DELETE FROM ".table("terms")." WHERE `id` = ?;", array($row["id"]));
+}
+dbQuery("DELETE FROM ".table("cv")." WHERE `shortname` = 'call_types';");
+$GLOBALS["ontomasticon"]["CVs"] = getCVs();
+
 section("Users and logging in");
 $_POST = array("first_name" => "Ada", "surname" => "Editor", "email" => " ada@example.org ", "password" => " correct horse ", "role" => "editor");
 capture(function() { return(createUser()); });

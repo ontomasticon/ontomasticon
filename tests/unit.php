@@ -111,6 +111,7 @@ checkSame("/update opens the admin update page",
   array("page_type" => "admin", "active_page" => "update", "active_subpage" => null, "active_subsubpage" => null),
   routeFor("/update"));
 checkSame("API endpoint", array("page_type" => "api", "active_page" => "term"), routeFor("/api/term/"));
+checkSame("the MCP server", array("page_type" => "api", "active_page" => "mcp"), routeFor("/api/mcp"));
 checkSame("other files in settings/ go to the home page", array("page_type" => "home"), routeFor("/settings/db.php"));
 checkSame("a term's own address, ignoring the query string",
   array("page_type" => "term", "active_page" => "acoustic_allometry"), routeFor("/acoustic_allometry?lang=fr"));
@@ -319,6 +320,8 @@ check("as does submitting a form", sessionFor(array("page_type" => "home"), "POS
 check("and a visitor who already has a session, who may be logged in", sessionFor(array("page_type" => "home"), "GET", array(), array(session_name() => "abc")));
 check("choosing one of the site's languages needs one, to remember it", sessionFor(array("page_type" => "home"), "GET", array("lang" => "en")));
 check("but not a language the site isn't offered in", !sessionFor(array("page_type" => "home"), "GET", array("lang" => "xx")));
+check("nor the MCP server, although requests to it are posted, even with a session cookie", !sessionFor(array("page_type" => "api", "active_page" => "mcp"), "POST")
+  && !sessionFor(array("page_type" => "api", "active_page" => "mcp"), "POST", array(), array(session_name() => "abc")));
 $_GET = array();
 $_COOKIE = array();
 unset($_SERVER["REQUEST_METHOD"]);
@@ -837,6 +840,8 @@ $_GET["q"] = str_repeat("é", 150);
 checkSame("and cut to 100 characters, rather than bytes", str_repeat("é", 100), searchQuery());
 $_GET["q"] = array("echo");
 checkSame("a search that isn't text is ignored", "", searchQuery());
+checkSame("searches from elsewhere, such as the MCP server, are trimmed and cut the same way", array("echo", str_repeat("é", 100)),
+  array(searchText("  echo "), searchText(str_repeat("é", 150))));
 $pageInfo = isset($GLOBALS["ontomasticon"]["pageInfo"]) ? $GLOBALS["ontomasticon"]["pageInfo"] : null;
 $_GET["q"] = "echo";
 $GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "home");
@@ -845,3 +850,204 @@ $GLOBALS["ontomasticon"]["pageInfo"] = array("page_type" => "term", "active_page
 check("other pages aren't, whatever their address has", !searchPage());
 $GLOBALS["ontomasticon"]["pageInfo"] = $pageInfo;
 unset($_GET["q"]);
+
+section("MCP server");
+//The value in nested arrays at a list of keys, or NULL if it isn't there
+function valueAt($value, $keys) {
+  foreach ($keys as $key) {
+    if (!is_array($value) || !array_key_exists($key, $value)) {
+      return(null);
+    }
+    $value = $value[$key];
+  }
+  return($value);
+}
+
+//The ways a value decoded from JSON doesn't match a JSON Schema, or none if it does. Only the keywords the MCP server's
+//schemas use are checked: type, enum, required, properties and items. An empty array matches both an object and a list.
+function schemaProblems($value, $schema, $path = "") {
+  if (isset($schema["type"])) {
+    $isList = is_array($value) && array_values($value) === $value;
+    $matches = FALSE;
+    foreach ((array)$schema["type"] as $type) {
+      $matches = $matches || ($type == "object" && is_array($value) && (!$isList || count($value) == 0)) || ($type == "array" && $isList)
+        || ($type == "string" && is_string($value)) || ($type == "integer" && is_int($value)) || ($type == "boolean" && is_bool($value))
+        || ($type == "null" && $value === null);
+    }
+    if (!$matches) {
+      return(array($path." isn't ".implode(" or ", (array)$schema["type"])));
+    }
+  }
+  $problems = array();
+  if (isset($schema["enum"]) && !in_array($value, $schema["enum"], TRUE)) {
+    $problems[] = $path." isn't one of its values";
+  }
+  foreach ((is_array($value) && isset($schema["required"])) ? $schema["required"] : array() as $key) {
+    if (!array_key_exists($key, $value)) {
+      $problems[] = $path."/".$key." is missing";
+    }
+  }
+  foreach ((is_array($value) && isset($schema["properties"])) ? $schema["properties"] : array() as $key => $property) {
+    if (array_key_exists($key, $value)) {
+      $problems = array_merge($problems, schemaProblems($value[$key], $property, $path."/".$key));
+    }
+  }
+  foreach ((is_array($value) && isset($schema["items"])) ? $value : array() as $index => $item) {
+    $problems = array_merge($problems, schemaProblems($item, $schema["items"], $path."/".$index));
+  }
+  return($problems);
+}
+
+//The MCP server's response to a request, as array(status, headers, the body decoded, the body). An array is sent as JSON.
+function testMCPResponse($message, $headers = array(), $method = "POST") {
+  $response = mcpResponse($method, $headers, is_string($message) ? $message : toJSON($message));
+  return(array($response["status"], $response["headers"], ($response["body"] === null) ? null : json_decode($response["body"], TRUE), $response["body"]));
+}
+
+//A request of protocol version 2026-07-28, which gives the version and the client's capabilities in its _meta
+function testMCPMessage($method, $params = array(), $id = 1) {
+  $params["_meta"] = array("io.modelcontextprotocol/protocolVersion" => "2026-07-28", "io.modelcontextprotocol/clientCapabilities" => new stdClass());
+  return(array("jsonrpc" => "2.0", "id" => $id, "method" => $method, "params" => $params));
+}
+
+//The headers a request of protocol version 2026-07-28 repeats its version, method and tool name in
+function testMCPHeaders($method, $name = null) {
+  $headers = array("mcp-protocol-version" => "2026-07-28", "mcp-method" => $method);
+  if ($name !== null) {
+    $headers["mcp-name"] = $name;
+  }
+  return($headers);
+}
+
+if (!function_exists("json_encode")) {
+  print "  MCP tests skipped: this PHP doesn't have the json extension.\n";
+} else {
+  list($status, , $response) = testMCPResponse(testMCPMessage("server/discover"), testMCPHeaders("server/discover"));
+  check("the MCP server isn't there unless the site turns it on", $status == 404 && $response === null);
+  $GLOBALS["ontomasticon"]["config"]["mcp_server"] = "1";
+
+  list($status, $headers, $response, $body) = testMCPResponse(testMCPMessage("server/discover"), testMCPHeaders("server/discover"));
+  check("server/discover answers with JSON", $status == 200 && in_array("Content-Type: application/json; charset=utf-8", $headers));
+  checkSame("giving the protocol versions the server supports, newest first", array("2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26"),
+    valueAt($response, array("result", "supportedVersions")));
+  check("and that it has tools, as an empty object", strpos($body, '"capabilities":{"tools":{}}') !== FALSE);
+  checkSame("in a complete result, which clients may keep for as long as public pages, from the server titled with the site's name",
+    array("complete", 300000, "public", array("name" => "ontomasticon", "title" => "Bioacoustics Glossary", "version" => $version)),
+    array(valueAt($response, array("result", "resultType")), valueAt($response, array("result", "ttlMs")), valueAt($response, array("result", "cacheScope")),
+      valueAt($response, array("result", "_meta", "io.modelcontextprotocol/serverInfo"))));
+  check("with instructions naming and describing the site, as plain text, and saying how to use the tools",
+    strpos((string)valueAt($response, array("result", "instructions")), "Bioacoustics Glossary: Terms used in bioacoustics.\n\nUse search_terms") === 0);
+  $GLOBALS["ontomasticon"]["config"]["license"] = "https://creativecommons.org/licenses/by/4.0/";
+  check("and the license, when the site has one", strpos(mcpInstructions(), "published under the license at https://creativecommons.org/licenses/by/4.0/.") !== FALSE);
+  unset($GLOBALS["ontomasticon"]["config"]["license"]);
+  list(, , $response) = testMCPResponse(testMCPMessage("server/discover", array(), "discover-1"), testMCPHeaders("server/discover"));
+  checkSame("a response has its request's id", "discover-1", valueAt($response, array("id")));
+
+  list($status, , $response, $body) = testMCPResponse(testMCPMessage("tools/list"), testMCPHeaders("tools/list"));
+  $tools = valueAt($response, array("result", "tools"));
+  checkSame("tools/list gives the tools, always in the same order", array("search_terms", "get_term", "list_vocabularies", "list_terms"),
+    is_array($tools) ? array_column($tools, "name") : null);
+  check("which clients may keep too", valueAt($response, array("result", "ttlMs")) === 300000 && valueAt($response, array("result", "cacheScope")) === "public");
+  $wellFormed = is_array($tools);
+  foreach (is_array($tools) ? $tools : array() as $tool) {
+    $wellFormed = $wellFormed && preg_match('/^[A-Za-z0-9_.-]{1,128}$/D', $tool["name"]) === 1 && $tool["description"] != ""
+      && valueAt($tool, array("inputSchema", "type")) === "object" && valueAt($tool, array("outputSchema", "type")) === "object"
+      && valueAt($tool, array("annotations", "readOnlyHint")) === TRUE;
+  }
+  check("each named with the characters MCP asks for, described, taking and giving objects, and only reading", $wellFormed);
+  check("a tool without arguments takes an object with no properties", strpos($body, '"inputSchema":{"type":"object","additionalProperties":false}') !== FALSE);
+  $searchSchema = mcpTools()[0]["outputSchema"];
+  checkSame("the tests' schema check finds results that don't match a tool's output schema", array(array(), array("/more is missing", "/terms isn't array")),
+    array(schemaProblems(array("terms" => array(), "more" => FALSE), $searchSchema), schemaProblems(array("terms" => "none"), $searchSchema)));
+
+  $discover = testMCPMessage("server/discover");
+  list($status, , $response) = testMCPResponse($discover, array("mcp-protocol-version" => "2026-07-28"));
+  checkSame("a request that doesn't repeat its method in a header is refused", array(400, -32020), array($status, valueAt($response, array("error", "code"))));
+  list($status, , $response) = testMCPResponse($discover, testMCPHeaders("tools/list"));
+  checkSame("as is one whose header gives another method", array(400, -32020), array($status, valueAt($response, array("error", "code"))));
+  list($status, , $response) = testMCPResponse($discover, array("mcp-protocol-version" => "2025-11-25", "mcp-method" => "server/discover"));
+  checkSame("or another protocol version", array(400, -32020), array($status, valueAt($response, array("error", "code"))));
+  $future = $discover;
+  $future["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"] = "2099-01-01";
+  list($status, , $response) = testMCPResponse($future, array("mcp-protocol-version" => "2099-01-01", "mcp-method" => "server/discover"));
+  checkSame("a protocol version the server doesn't support is refused, listing those it does", array(400, -32022, mcpVersions(), "2099-01-01"),
+    array($status, valueAt($response, array("error", "code")), valueAt($response, array("error", "data", "supported")), valueAt($response, array("error", "data", "requested"))));
+  $withoutCapabilities = $discover;
+  unset($withoutCapabilities["params"]["_meta"]["io.modelcontextprotocol/clientCapabilities"]);
+  list($status, , $response) = testMCPResponse($withoutCapabilities, testMCPHeaders("server/discover"));
+  checkSame("as is a request that doesn't give the client's capabilities", array(400, -32602), array($status, valueAt($response, array("error", "code"))));
+  list($status, , $response) = testMCPResponse(testMCPMessage("ping"), testMCPHeaders("ping"));
+  checkSame("methods the protocol no longer has, such as ping, aren't found", array(404, -32601), array($status, valueAt($response, array("error", "code"))));
+
+  $emptySearch = testMCPMessage("tools/call", array("name" => "search_terms", "arguments" => array("query" => " ")));
+  list($status, , $response) = testMCPResponse($emptySearch, testMCPHeaders("tools/call", "get_term"));
+  checkSame("a tool call whose header names another tool is refused", array(400, -32020), array($status, valueAt($response, array("error", "code"))));
+  list($status, , $response) = testMCPResponse($emptySearch, testMCPHeaders("tools/call"));
+  checkSame("as is one that doesn't name its tool in a header", array(400, -32020), array($status, valueAt($response, array("error", "code"))));
+  list($status, , $response) = testMCPResponse(testMCPMessage("tools/call", array("name" => "sïng")), testMCPHeaders("tools/call", "=?base64?".base64_encode("sïng")."?="));
+  checkSame("a tool name encoded in the header is decoded, and a tool the server doesn't have is an error", array(200, -32602),
+    array($status, valueAt($response, array("error", "code"))));
+  list($status, , $response) = testMCPResponse($emptySearch, testMCPHeaders("tools/call", "search_terms"));
+  check("arguments a tool can't use give a result that is an error, saying what to change", $status == 200 && valueAt($response, array("result", "isError")) === TRUE
+    && strpos((string)valueAt($response, array("result", "content", 0, "text")), "query") !== FALSE && valueAt($response, array("result", "resultType")) === "complete");
+  $errors = array(
+    mcpCallTool("search_terms", array("query" => "echo", "limit" => 0)),
+    mcpCallTool("search_terms", array("query" => "echo", "limit" => "ten")),
+    mcpCallTool("get_term", array()),
+    mcpCallTool("list_terms", array("vocabulary" => "nowhere")),
+    mcpCallTool("list_terms", array("offset" => -1))
+  );
+  checkSame("as do a limit out of range, a term that isn't named, an unknown vocabulary and a negative offset", array(TRUE, TRUE, TRUE, TRUE, TRUE),
+    array_column($errors, "isError"));
+  checkSame("a whole number can be given as 10 or 10.0, but not 10.5", array(10, 10, null), array(mcpWholeNumber(10), mcpWholeNumber(10.0), mcpWholeNumber(10.5)));
+  checkSame("calling a tool the server doesn't have gives nothing", null, mcpCallTool("delete_everything", array()));
+  checkSame("header values encoded as Base64 are decoded", array("sïng", "plain", null),
+    array(mcpHeaderValue("=?base64?".base64_encode("sïng")."?="), mcpHeaderValue("plain"), mcpHeaderValue("=?base64?!!?=")));
+
+  $initialize = array("jsonrpc" => "2.0", "id" => 1, "method" => "initialize",
+    "params" => array("protocolVersion" => "2025-06-18", "capabilities" => new stdClass(), "clientInfo" => array("name" => "Test", "version" => "1")));
+  list($status, $headers, $response) = testMCPResponse($initialize);
+  checkSame("clients of earlier versions start with initialize, and get the version they ask for", array(200, "2025-06-18"),
+    array($status, valueAt($response, array("result", "protocolVersion"))));
+  check("with the server's name, its tools and instructions", valueAt($response, array("result", "serverInfo", "name")) === "ontomasticon"
+    && valueAt($response, array("result", "capabilities", "tools")) === array() && is_string(valueAt($response, array("result", "instructions"))));
+  check("but no session", count(preg_grep('/^Mcp-Session-Id:/i', $headers)) == 0);
+  $initialize["params"]["protocolVersion"] = "2024-11-05";
+  list(, , $response) = testMCPResponse($initialize);
+  checkSame("a version the server doesn't support gets the newest that starts with initialize", "2025-11-25", valueAt($response, array("result", "protocolVersion")));
+  list($status, , , $body) = testMCPResponse(array("jsonrpc" => "2.0", "method" => "notifications/initialized"), array("mcp-protocol-version" => "2025-06-18"));
+  check("notifications are accepted, with no reply", $status == 202 && $body === null);
+  list(, , , $body) = testMCPResponse(array("jsonrpc" => "2.0", "id" => 2, "method" => "ping"), array("mcp-protocol-version" => "2025-06-18"));
+  check("these clients can ping, and get an empty object", strpos((string)$body, '"result":{}') !== FALSE);
+  list($status, , $response) = testMCPResponse(array("jsonrpc" => "2.0", "id" => 3, "method" => "tools/list"), array("mcp-protocol-version" => "2025-11-25"));
+  checkSame("and list the tools without giving _meta", array(200, 4), array($status, count((array)valueAt($response, array("result", "tools")))));
+  list($status, , $response) = testMCPResponse(array("jsonrpc" => "2.0", "id" => 4, "method" => "tools/list"));
+  checkSame("as can clients of 2025-03-26, which don't give their version in a header", array(200, 4), array($status, count((array)valueAt($response, array("result", "tools")))));
+  list($status, , $response) = testMCPResponse(array("jsonrpc" => "2.0", "id" => 5, "method" => "resources/list"), array("mcp-protocol-version" => "2025-11-25"));
+  checkSame("a method they ask for that the server doesn't have is only an error in the response, as they may take an HTTP error as a failed connection",
+    array(200, -32601), array($status, valueAt($response, array("error", "code"))));
+  list($status, , $response) = testMCPResponse(array("jsonrpc" => "2.0", "id" => 6, "method" => "tools/list"), array("mcp-protocol-version" => "2099-01-01"));
+  checkSame("a version in their header that the server doesn't support is refused", array(400, -32022), array($status, valueAt($response, array("error", "code"))));
+
+  list($status, $headers) = testMCPResponse("", array(), "GET");
+  check("GET isn't allowed, as the server sends no messages of its own", $status == 405 && in_array("Allow: POST, OPTIONS", $headers));
+  list($status) = testMCPResponse("", array(), "DELETE");
+  checkSame("nor is DELETE, as there are no sessions to end", 405, $status);
+  list($status, $headers) = testMCPResponse("", array(), "OPTIONS");
+  check("browsers may let scripts on other websites post requests with the headers MCP uses",
+    $status == 204 && count(preg_grep('/^Access-Control-Allow-Headers: .*MCP-Protocol-Version, Mcp-Method, Mcp-Name/', $headers)) == 1);
+  list($status, , $response) = testMCPResponse("{not json");
+  check("a request that isn't JSON is a parse error, without an id", $status == 400 && valueAt($response, array("error", "code")) === -32700
+    && !array_key_exists("id", (array)$response));
+  list($status, , $response) = testMCPResponse(array(testMCPMessage("tools/list"), testMCPMessage("server/discover", array(), 2)), testMCPHeaders("tools/list"));
+  checkSame("several messages sent together are refused", array(400, -32600), array($status, valueAt($response, array("error", "code"))));
+  $nullID = testMCPMessage("tools/list");
+  $nullID["id"] = null;
+  list($status, , $response) = testMCPResponse($nullID, testMCPHeaders("tools/list"));
+  checkSame("as is a request whose id is null", array(400, -32600), array($status, valueAt($response, array("error", "code"))));
+  list($status) = testMCPResponse(str_repeat(" ", MCP_BODY_LIMIT + 1));
+  checkSame("or one that is too large", 413, $status);
+  list($status) = testMCPResponse(array("jsonrpc" => "2.0", "id" => 7, "result" => new stdClass()));
+  checkSame("a response to a request is accepted and ignored, as the server sends no requests", 202, $status);
+  unset($GLOBALS["ontomasticon"]["config"]["mcp_server"]);
+}

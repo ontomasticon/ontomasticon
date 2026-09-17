@@ -49,9 +49,9 @@ if (sessionNeeded($GLOBALS["ontomasticon"]["pageInfo"])) {
   header("Vary: Cookie", FALSE);
 }
 
-// Ignore form submissions that don't carry this session's CSRF token
+// Ignore form submissions that don't carry this session's CSRF token. The MCP server takes no forms.
 $GLOBALS["ontomasticon"]["csrf_failed"] = FALSE;
-if ($_SERVER["REQUEST_METHOD"] == "POST" && !csrfValid()) {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && !mcpPage($GLOBALS["ontomasticon"]["pageInfo"]) && !csrfValid()) {
   $_POST = array();
   $GLOBALS["ontomasticon"]["csrf_failed"] = TRUE;
 }
