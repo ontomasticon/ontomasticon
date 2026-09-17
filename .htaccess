@@ -21,3 +21,13 @@
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteRule ^ index.php [L]
 </IfModule>
+
+# Compress the text the site sends, including the JSON, JSON-LD and Turtle of the API, the linked data and the
+# MCP server, which Apache's usual settings leave out. Every type is listed, as a list here can take the place of
+# the server's own list for this directory.
+<IfModule mod_deflate.c>
+  <IfModule mod_filter.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript
+    AddOutputFilterByType DEFLATE application/xml image/svg+xml application/json application/ld+json text/turtle
+  </IfModule>
+</IfModule>
