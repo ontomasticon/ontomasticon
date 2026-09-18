@@ -19,6 +19,7 @@ if (file_exists("settings/db.php")) {
 }
 
 if ($db->connect_error) {
+  http_response_code(503);
   print("<p>Could not connect to the database.</p>");
   exit;
 }
@@ -39,6 +40,19 @@ if (!validTablePrefix(tablePrefix())) {
 $GLOBALS["ontomasticon"]["config"] = getConfig($db);
 
 $GLOBALS["ontomasticon"]["pageInfo"] = activePage();
+
+// Status checks for monitoring: /ping shows the site is up, and /dbping that its database answers a query now. They need
+// no session, and browsers and caches mustn't keep their replies.
+if (in_array($GLOBALS["ontomasticon"]["pageInfo"]["page_type"], array("ping", "dbping"), TRUE)) {
+  header("Cache-Control: no-store");
+  if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "dbping" && !$db->query("SELECT 1;")) {
+    http_response_code(503);
+    print "Database connection failed: the database is not answering";
+  } else {
+    print "pong";
+  }
+  exit;
+}
 
 // Start a session only for the visitors who need one (see sessionNeeded()). PHP tells browsers not to keep pages that
 // use a session; other pages may be kept for a few minutes, but not once the visitor's cookies change, as on logging in.
@@ -69,7 +83,7 @@ if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "user" && $GLOBALS["ont
 // Accounts still using the default password may only change it or log out
 if (isset($_SESSION["user"]) && !empty($_SESSION["must_change_password"])) {
   $page = $GLOBALS["ontomasticon"]["pageInfo"];
-  $allowed = in_array($page["page_type"], array("api", "ping"))
+  $allowed = $page["page_type"] == "api"
     || ($page["page_type"] == "user" && $page["active_page"] == "settings")
     || ($page["page_type"] == "user" && $page["active_page"] == "login" && !isset($_POST['submit']));
   if (!$allowed) {
@@ -123,9 +137,6 @@ if (pageNotFound()) {
 switch($GLOBALS["ontomasticon"]["pageInfo"]["page_type"]) {
   case "api":
     template("api.php");
-    break;
-  case "ping":
-    print "pong";
     break;
   case "robots.txt":
     template("robots.php");
