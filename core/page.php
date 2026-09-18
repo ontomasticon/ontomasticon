@@ -23,7 +23,9 @@ function activePage() {
       $ret["active_page"] = (isset($parts[2])) ? $parts[2] : "";
       break;
     case "ping":
-      $ret["page_type"] = "ping";
+    case "dbping":
+      //Status checks, which index.php answers
+      $ret["page_type"] = $parts[1];
       $ret["active_page"] = "";
       break;
     case "update":
@@ -84,7 +86,7 @@ function activePage() {
 
 //The first path segments that activePage() sends somewhere other than a term's page. Keep this in step with its cases.
 function reservedRouteSegments() {
-  return(array("api", "cv", "ping", "update", "user", "admin", "settings", "robots.txt", "sitemap.xml", "favicon.ico"));
+  return(array("api", "cv", "ping", "dbping", "update", "user", "admin", "settings", "robots.txt", "sitemap.xml", "favicon.ico"));
 }
 
 //The RDF format asked for with ?format=: "jsonld" for format=jsonld, "turtle" for format=ttl, otherwise NULL

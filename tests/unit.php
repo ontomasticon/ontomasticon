@@ -117,6 +117,8 @@ checkSame("a term's own address, ignoring the query string",
   array("page_type" => "term", "active_page" => "acoustic_allometry"), routeFor("/acoustic_allometry?lang=fr"));
 checkSame("robots.txt, sitemap.xml and favicon.ico, which index.php makes", array("robots.txt", "sitemap.xml", "favicon.ico"),
   array(routeFor("/robots.txt")["page_type"], routeFor("/sitemap.xml")["page_type"], routeFor("/favicon.ico")["page_type"]));
+checkSame("the status checks of the site and its database", array(array("page_type" => "ping", "active_page" => ""),
+  array("page_type" => "dbping", "active_page" => "")), array(routeFor("/ping"), routeFor("/dbping?x=1")));
 $routedElsewhere = array_values(array_filter(reservedRouteSegments(), function($segment) {
   return(routeFor("/".$segment."/")["page_type"] != "term");
 }));
