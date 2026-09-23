@@ -139,9 +139,11 @@ $db->query("UPDATE ".table("terms")." SET `acronym` = NULL WHERE `shortname` = '
 list(, $headers, $body) = httpRequest("GET", "/ping");
 checkSame("ping", "pong", $body);
 check("which browsers and caches don't keep", hasHeader($headers, '/^Cache-Control: no-store$/i'));
+check("and any website's scripts may read", hasHeader($headers, '/^Access-Control-Allow-Origin: \*$/i'));
 list($status, $headers, $body) = httpRequest("GET", "/dbping");
 checkSame("dbping, when the database answers", array(200, "pong"), array($status, $body));
 check("which isn't kept either, nor starts a session", hasHeader($headers, '/^Cache-Control: no-store$/i') && !hasHeader($headers, '/^Set-Cookie:/i'));
+check("and any website's scripts may read too", hasHeader($headers, '/^Access-Control-Allow-Origin: \*$/i'));
 list(, , $body) = httpRequest("GET", "/cv");
 check("/cv without a name lists the vocabularies", strpos($body, "There are no controlled vocabularies yet") !== FALSE);
 list(, , $body) = httpRequest("GET", "/cv/nonexistent");

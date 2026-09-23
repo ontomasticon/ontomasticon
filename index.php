@@ -42,9 +42,11 @@ $GLOBALS["ontomasticon"]["config"] = getConfig($db);
 $GLOBALS["ontomasticon"]["pageInfo"] = activePage();
 
 // Status checks for monitoring: /ping shows the site is up, and /dbping that its database answers a query now. They need
-// no session, and browsers and caches mustn't keep their replies.
+// no session, and browsers and caches mustn't keep their replies. A status page on another website reads them with a
+// script, so they say any origin may, as the API does; they hold no data, and browsers send no cookies with "*".
 if (in_array($GLOBALS["ontomasticon"]["pageInfo"]["page_type"], array("ping", "dbping"), TRUE)) {
   header("Cache-Control: no-store");
+  header("Access-Control-Allow-Origin: *");
   if ($GLOBALS["ontomasticon"]["pageInfo"]["page_type"] == "dbping" && !$db->query("SELECT 1;")) {
     http_response_code(503);
     print "Database connection failed: the database is not answering";
