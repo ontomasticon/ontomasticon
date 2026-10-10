@@ -15,7 +15,7 @@ jobs:
         # Oldest supported version, and recent 8.x releases
         php: ['7.3', '8.1', '8.4']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: shivammathur/setup-php@v2
         with:
